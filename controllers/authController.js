@@ -41,7 +41,7 @@ const loginUser = async (Model, req, res) => {
 
 
 
-        const token = jwt.sign({ user_id: user._id,role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ user_id: user._id,role }, process.env.JWT_SECRET, { expiresIn: '24h' });
         log('login',role,user._id);
         res.json({ token });
     } catch (err) {
@@ -157,7 +157,7 @@ const createParent = async (req, res) => {
         }
         
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newParent = new Parent({ name, email, password: hashedPassword, contactNumber,cnic });
+        const newParent = new Parent({ name, email, password: hashedPassword, contactNumber,cnic,children });
         //validate the children array to have valid mongoose ids    
 
         
