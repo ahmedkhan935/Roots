@@ -14,7 +14,7 @@ const BranchSchema = new Schema({
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    complains: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Complain' }]
+    complaints: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Complaint' }]  // fixed reference name
 });
 
 BranchSchema.pre('save', function(next) {

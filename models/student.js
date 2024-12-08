@@ -31,10 +31,6 @@ const studentSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    grade: {
-        type: String,
-        required: true
-    },
     address: {
         type: String,
         required: true
@@ -43,14 +39,22 @@ const studentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Branch'
     },
-    classes: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Class'
-    }],
+    // classes: [{
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'Class'
+    // }],
     parent: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Parent'
-    }
+    },
+    class : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Classroom'
+    },
+    curr_merit_points: {
+        type: Number,
+        default: 0
+    },
 });
 
 module.exports = mongoose.model('Student', studentSchema);

@@ -5,9 +5,11 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const authroutes = require('./routes/authRoute');
 const branchRoutes = require('./routes/branchRoute');
+const meritRoutes = require('./routes/meritRoute');
 app.use(express.json());
 app.use('/api/auth', authroutes);
 app.use('/api/branch', branchRoutes);
+app.use('/api/merit', meritRoutes);
 app.use(cors());
 dotenv.config();
 connectDB().then(() => {

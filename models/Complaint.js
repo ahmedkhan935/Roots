@@ -11,5 +11,12 @@ const ComplaintSchema = new Schema({
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Parent' },
     branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }
-
 });
+
+ComplaintSchema.pre('save', function(next) {
+    this.updatedAt = Date.now();
+    next();
+});
+
+const Complaint = mongoose.model('Complaint', ComplaintSchema);
+module.exports = Complaint;

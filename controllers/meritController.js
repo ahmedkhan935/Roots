@@ -1,15 +1,21 @@
 const { MeritTemplate, DemeritTemplate, AwardedPoints } = require('../models/merit'); 
+const student = require('../models/student');
 // Award points to a student
 const awardPoints = async (req, res) => {
     try {
-        const { studentId, points, reason, awardedBy } = req.body;
-        if (!studentId || !points || !reason || !awardedBy) {
+        const { studentId, points, reason } = req.body;
+        if (!studentId || !points || !reason ) {
             return res.status(400).json({ message: 'All fields are required' });
         }
-        var awardedByModel
-        if(req.role!=='Teacher' && req.role!=='BranchAdmin'){
-            return res.status(401).json({ message: 'Unauthorized' });
+        const existingStudent = await student.findById(studentId);
+        if (!existingStudent) {
+            return res.status(404).json({ message: 'Student not found' });
         }
+
+
+        awardedBy = req.user_id;
+        var awardedByModel
+    
         if(req.role==='teacher'){
             awardedByModel='Teacher'
         }
@@ -19,6 +25,9 @@ const awardPoints = async (req, res) => {
         const awardedPoints = new AwardedPoints({ studentId, points, reason, awardedBy,awardedByModel
 
          });
+         existingStudent.curr_merit_points+=points;
+        await existingStudent.save();
+        
         await awardedPoints.save();
         res.status(201).json(awardedPoints);
     } catch (err) {
@@ -76,8 +85,8 @@ const getDemeritTemplates = async (req, res) => {
 
 const getStudentPoints = async (req, res) => {
     try {
-        const student = await Student.findById(req.params.studentId);
-        if (!student) {
+        const existingStudent = await student.findById(req.params.studentId);
+        if (!existingStudent) {
             return res.status(404).json({ message: 'Student not found' });
         }
 
@@ -103,7 +112,7 @@ const getStudentPoints = async (req, res) => {
         }
 
         const studentPoints = await AwardedPoints.find(filter);
-        res.json(studentPoints);
+        res.json({studentPoints,curr_merit_points:existingStudent.curr_merit_points});
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -113,5 +122,8 @@ const getStudentPoints = async (req, res) => {
 module.exports = {
     createMeritTemplate,
     createDemeritTemplate,
-    awardPoints
+    awardPoints,
+    getMeritTemplates,
+    getDemeritTemplates,
+    getStudentPoints
 };

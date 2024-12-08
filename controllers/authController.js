@@ -9,6 +9,8 @@ const dotenv = require('dotenv');
 const Branch = require('../models/branch');
 const log = require('../utils/logger').log;
 const { verifyAdmin, verifyBranchAdmin, verifyTeacher, verifyStudent } = require('../middlewares/auth');
+const student = require('../models/student');
+const { default: mongoose } = require('mongoose');
 dotenv.config();
 
 
@@ -153,14 +155,30 @@ const createParent = async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
+        
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newParent = new Parent({ name, email, password: hashedPassword, contactNumber, children,cnic });
+        const newParent = new Parent({ name, email, password: hashedPassword, contactNumber,cnic });
+        //validate the children array to have valid mongoose ids    
+
+        
+        children.map ( async (child) => {
+           
+
+            const student = await Student.findById
+            (child);
+            if(!student) {
+                return res.status(400).json({ message: 'Student not found' });
+            }
+            student.parent = newParent._id; ;
+            await student.save();
+        });
+
         await newParent.save();
         log('create Parent','branchadmin',req.user_id);
         res.status(201).json({ message: 'Parent created successfully' });
     }
     catch (err) {
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: err });
     }
 }
 exports.createParent = createParent;

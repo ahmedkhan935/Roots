@@ -32,7 +32,8 @@ const AwardedPointsSchema = new Schema({
         required: true,
         enum: ['Teacher', 'BranchAdmin']
     },
-    date: { type: Date, default: Date.now }
+    date: { type: Date, default: Date.now },
+    current : {type: Boolean, default: true}
 });
 
 const AwardedPoints = mongoose.model('AwardedPoints', AwardedPointsSchema);

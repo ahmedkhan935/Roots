@@ -33,8 +33,16 @@ const teacherSchema = new mongoose.Schema({
         required: true
     },
     classes: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Classroom'
+        type:{
+            class_id: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Classroom'
+            },
+            subject_name: {
+                type: String,
+                required: true
+            }
+        }
     }],
     branch_id: {
         type: mongoose.Schema.Types.ObjectId,

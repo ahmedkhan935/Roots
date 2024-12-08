@@ -1,7 +1,8 @@
 const Branch = require('../models/branch');
 const Classroom = require('../models/classroom');
-const student = require('../models/student');
-const teacher = require('../models/teacher');
+const { AwardedPoints } = require('../models/merit');
+const Student = require('../models/student');
+const Teacher = require('../models/teacher');
 const { log } = require('../utils/logger');
 
 
@@ -71,293 +72,289 @@ const deleteBranch = async (req, res) => {
             return res.status(404).json({ message: 'Branch not found' });
         }
         log(`Branch deleted ${branch._id}`,'superadmin',req.user_id);
-        res.status(204).json();
+        res.status(204).json({message: 'Branch deleted'});
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 }
+// Add a new class
 const AddClass = async (req, res) => {
+    const { name, branch_id } = req.body;
+    if (!name || !branch_id) {
+        return res.status(400).json({ message: 'Name and branch_id are required' });
+    }
     try {
-        const {name,teacherId,students,branch_id} = req.body;
-        const branch = await Branch.findById(branch_id);
-
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch not found' });
-        }
-        const teacher = await Teacher.findById(teacherId);
-        if (!teacher) {
-            return res.status(404).json({ message: 'Teacher not found' });
-        }
-        students.map(async element => {
-            const student = await student.findById(element);
-            if (!student) {
-                return res.status(404).json({ message: 'Invalid Student',error:element });
-            }
-            
-        });
-        const new_class = new Classroom({
+        const classroom = new Classroom({
             name,
-            teacherId,
-            students,
-            branch_id
+            branch_id,
+            students: [],
+            subjects: []
         });
-        await new_class.save();
-        branch.classes.push(new_class._id);
-        await branch.save();
-        log(`Class added ${new_class._id}`,'branchadmin',req.user_id);
-        res.status(200).json(branch);
+        await classroom.save();
+        
+        // Update branch with new class reference if needed
+        log('Class created ' + classroom._id, 'branchadmin', req.user_id);
+        res.status(201).json(classroom);
     } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const updateClass = async (req, res) => {   
-    try {
-        const classroom = await Classroom.findByIdAndUpdate
-        (req.params.id, req.body, { new: true });
-        if (!classroom) {
-            return res.status(404).json({ message: 'Class not found' });
-        }
-        log(`Class updated ${classroom._id}`,'branchadmin',req.user_id);
-        res.status(200).json(classroom);
-    }
-    catch (err) {
         res.status(400).json({ message: err.message });
     }
 }
-const deleteClass = async (req, res) => {
+
+// Add students to a class
+const addStudentsToClass = async (req, res) => {
+    const { class_id, student_ids } = req.body;
+    if (!class_id || !student_ids || !Array.isArray(student_ids)) {
+        return res.status(400).json({ message: 'Class ID and array of student IDs are required' });
+    }
     try {
-        const classroom = await Classroom.findByIdAndDelete(req.params.id);
+        const classroom = await Classroom.findById(class_id);
         if (!classroom) {
             return res.status(404).json({ message: 'Class not found' });
         }
 
-        log(`Class deleted ${classroom._id}`,'branchadmin',req.user_id);
-        res.status(204).json();
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const getClass = async (req, res) => {
-    try {
-        const classroom = await Classroom.findById(req.params.id);
-        if (!classroom) {
-            return res.status(404).json({ message: 'Class not found' });
+        // Update students' class reference
+        await Student.updateMany(
+            { _id: { $in: student_ids } },
+            { class: class_id }
+        );
+
+        // Add students to class
+        classroom.students.push(...student_ids);
+        await classroom.save();
+
+        const prev_points=await AwardedPoints.find({ student_id: { $in: student_ids } })
+        if(prev_points.length>0){
+            await AwardedPoints.updateMany(
+                { student_id: { $in: student_ids } },
+                { current:false }
+            );
         }
-        log(`Class read ${classroom._id}`,'branchadmin',req.user_id);
+
+
+
+
+        log('Students added to class ' + class_id, 'branchadmin', req.user_id);
         res.status(200).json(classroom);
     } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-const getClassbyId = async (req, res) => {
-    try {
-        const classroom = await Classroom.findById(req.params.id);
-        if (!classroom) {
-            return res.status(404).json({ message: 'Class not found' });
-        }
-        log(`Class read ${classroom._id}`,'branchadmin',req.user_id);
-        res.status(200).json(classroom);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(400).json({ message: err.message });
     }
 }
-const getStudentClasses = async (req, res) => {
+
+// Change student's class
+const changeStudentClass = async (req, res) => {
+    const { student_id, new_class_id } = req.body;
+    if (!student_id || !new_class_id) {
+        return res.status(400).json({ message: 'Student ID and new class ID are required' });
+    }
     try {
-        const student = await student.findById(req.params.id);
+        const student = await Student.findById(student_id);
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
         }
-        const classes = await Classroom.find({ students: student._id });
-        log(`Student classes read ${student._id}`,'student',req.user_id);
-        res.status(200).json(classes);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const getTeacherClasses = async (req, res) => {
-    try {
-        const teacher = await teacher.findById(req.params.id);
-        if (!teacher) {
-            return res.status(404).json({ message: 'Teacher not found' });
-        }
-        const classes = await Classroom.find({ teacherId: teacher._id });
-        log(`Teacher classes read ${teacher._id}`,'teacher',req.user_id);
-        res.status(200).json(classes);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const getBranchClasses = async (req, res) => {
-    try {
-        const branch = await Branch.findById(req.params.id);
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch not found' });
-        }
-        const classes = await Classroom.find({ branch_id: branch._id });
-        log(`Branch classes read ${branch._id}`,'branchadmin',req.user_id);
-        res.status(200).json(classes);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const getBranchTeachers = async (req, res) => {
-    try {
-        const branch = await Branch.findById(req.params.id);
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch not found' });
-        }
-        const teachers = await teacher.find({ branch_id: branch._id });
-        log(`Branch teachers read ${branch._id}`,'branchadmin',req.user_id);
-        res.status(200).json(teachers);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const getBranchStudents = async (req, res) => {
-    try {
-        const branch = await Branch.findById(req.params.id);    
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch not found' });
-        }
-        const students = await student.find({ branch_id: branch._id });
 
-        log(`Branch students read ${branch._id}`,'branchadmin',req.user_id);
-        res.status(200).json(students);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const addStudentsToClass = async (req, res) => {
-    try {
-        const {students,classId} = req.body;
-        students.map(async element => {
-            const student = await student.findById(element);
-            if (!student) {
-                return res.status(404).json({ message: 'Invalid Student',error:element });
-            }
-            
-            
+        // Remove from old class
+        if (student.class) {
+            await Classroom.findByIdAndUpdate(
+                student.class,
+                { $pull: { students: student_id } }
+            );
         }
+
+        // Add to new class
+        await Classroom.findByIdAndUpdate(
+            new_class_id,
+            { $push: { students: student_id } }
         );
 
-        const classroom = await Classroom.findById(classId);
-        if (!classroom) {
-            return res.status(404).json({ message: 'Class not found' });
-        }
-        classroom.students.push(...students);
-        await classroom.save();
-        //add class to student
-        students.map(async element => {
-            const student = await student.findById(element);
-            student.classes.push(classroom._id);
-
-            await student.save();
-        });
-
-        log(`Student added to class ${classroom._id}`,'branchadmin',req.user_id);
-        res.status(200).json(classroom);
-    }
-    catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-}
-const removeStudentsFromClass = async (req, res) => {
-    try {
-        const {students,classId} = req.body;
-        const classroom = await Classroom.findById(classId);
-        if (!classroom) {
-            return res.status(404).json({ message: 'Class not found' });
-        }
-        students.map(async element => {
-            const student = await student.findById(element);
-            if (!student) {
-                return res.status(404).json({ message: 'Invalid Student',error:element });
-            }
-            if (!classroom.students.includes(element)) {
-                return res.status(404).json({ message: 'Student not in class',error:element });
-            }
-            
-        }
+        // Update student's class reference
+        student.class = new_class_id;
+        student.curr_merit_points=0;
+        await student.save();
+        await AwardedPoints.updateMany(
+            { student_id: student_id },
+            { current:false }
         );
-        classroom.students = classroom.students.filter(element => !students.includes(element));
-        await classroom.save();
-        //remove class from student
-        students.map(async element => {
-            const student = await student.findById(element);
-            student.classes = student.classes.filter(classId => classId !== classroom._id);
-            await student.save();
+        
+
+        log('Student class changed ' + student_id, 'branchadmin', req.user_id);
+        res.status(200).json(student);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+}
+
+// Add subject to class
+const addSubjectToClass = async (req, res) => {
+    const { class_id, subject_name } = req.body;
+    if (!class_id || !subject_name) {
+        return res.status(400).json({ message: 'Class ID and subject name are required' });
+    }
+    try {
+        const classroom = await Classroom.findById(class_id);
+        if (!classroom) {
+            return res.status(404).json({ message: 'Class not found' });
+        }
+        const subjectExists = classroom.subjects.some(subject => subject.name === subject_name);
+        if (subjectExists) {
+            return res.status(400).json({ message: 'Subject already exists' });
+        }
+
+
+        classroom.subjects.push({
+            name: subject_name
         });
-        log(`Student removed from class ${classroom._id}`,'branchadmin',req.user_id);
+        await classroom.save();
+
+        log('Subject added to class ' + class_id, 'branchadmin', req.user_id);
         res.status(200).json(classroom);
-    }
-    catch (err) {
-        res.status(500).json({ message: err.message });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
     }
 }
-const assignTeacher= async (req, res) => {
+
+// Assign teacher to subject
+const assignTeacher = async (req, res) => {
+    const { class_id, subject_id, teacher_id } = req.body;
+    
+    if (!class_id || (!subject_id ) || !teacher_id) {
+        return res.status(400).json({ message: 'Class ID, subject ID and teacher ID are required' });
+    }
     try {
-        const {teacherId,classId} = req.body;
-        const classroom = await Classroom.findById(classId);
+        //use or query to find subject by name or id
+       
+            
+        const classroom = await Classroom.findById(class_id);
         if (!classroom) {
             return res.status(404).json({ message: 'Class not found' });
         }
-        if(classroom.teacherId){    
-            return res.status(400).json({ message: 'Teacher already assigned' });
+        let subject;
+        if(subject_id){
+            subject = classroom.subjects.id(subject_id);
+            if (!subject) {
+                return res.status(404).json({ message: 'Subject not found' });
+            }
         }
-        const teacher = await teacher.findById(teacherId);
-        if (!teacher) {
-            return res.status(404).json({ message: 'Teacher not found' });
-        }
-        if(classroom)
-        classroom.teacherId = teacherId;
+       
+        subject.teacher = teacher_id;
         await classroom.save();
-        teacher.classes.push(classroom._id);
-        log(`Teacher assigned to class ${classroom._id}`,'branchadmin',req.user_id);
+
+        // Add class to teacher's classes
+        await Teacher.findByIdAndUpdate(
+            teacher_id,
+            { $addToSet: { classes: {class_id,"subject_name":subject.name} } }
+        );
+
+        log('Teacher assigned to subject ' + subject_id, 'branchadmin', req.user_id);
         res.status(200).json(classroom);
-    }
-    catch (err) {
-        res.status(500).json({ message: err.message });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
     }
 }
-const removeClassFromTeacher = async (req, res) => {
+
+// Change teacher of subject
+const changeSubjectTeacher = async (req, res) => {
+    const { class_id, subject_id, new_teacher_id } = req.body;
+    if (!class_id || !subject_id || !new_teacher_id) {
+        return res.status(400).json({ message: 'Class ID, subject ID and new teacher ID are required' });
+    }
     try {
-        const {teacherId,classId} = req.body;
-        const classroom = await Classroom.findById(classId);
+        const classroom = await Classroom.findById(class_id);
         if (!classroom) {
             return res.status(404).json({ message: 'Class not found' });
         }
-        const teacher = await teacher.findById(teacherId);
+
+        const subject = classroom.subjects.id(subject_id);
+        if (!subject) {
+            return res.status(404).json({ message: 'Subject not found' });
+        }
+
+        // Remove class from old teacher's classes
+        if (subject.teacher) {
+            await Teacher.findByIdAndUpdate(
+                subject.teacher,
+                { $pull: { classes: class_id } }
+            );
+        }
+
+        // Add class to new teacher's classes
+        await Teacher.findByIdAndUpdate(
+            new_teacher_id,
+            { $addToSet: { classes: class_id } }
+        );
+
+        subject.teacher = new_teacher_id;
+        await classroom.save();
+
+        log('Subject teacher changed ' + subject_id, 'branchadmin', req.user_id);
+        res.status(200).json(classroom);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+}
+
+// Get student class with subjects
+const getStudentClassWithSubjects = async (req, res) => {
+    const { student_id } = req.params;
+    try {
+        const student = await Student.findById(student_id)
+            .populate({
+                path: 'class',
+                populate: {
+                    path: 'subjects.teacher',
+                    select: 'name email contactNumber'
+                }
+            });
+        
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        log('Student class details retrieved ' + student_id, req.role, req.user_id);
+        res.status(200).json(student);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+}
+
+// Get all teacher subjects
+const getTeacherSubjects = async (req, res) => {
+    const { teacher_id } = req.params;
+    try {
+        const teacher = await Teacher.findById(teacher_id);
         if (!teacher) {
             return res.status(404).json({ message: 'Teacher not found' });
         }
-        classroom.teacherId = null;
-        await classroom.save();
-        teacher.classes = teacher.classes.filter(classId => classId !== classroom._id);
-        await teacher.save();
-        log(`Teacher removed from class ${classroom._id}`,'branchadmin',req.user_id);
-        res.status(200).json(classroom);
-    }
-    catch (err) {
-        res.status(500).json({ message: err.message });
+
+        const classes = await Classroom.find({
+            'subjects.teacherId': teacher_id
+        }).select('name subjects');
+
+        const subjects = classes.map(classroom => ({
+            class_name: classroom.name,
+            subjects: classroom.subjects.filter(subject => 
+                subject.teacherId && subject.teacherId.toString() === teacher_id
+            )
+        }));
+
+        log('Teacher subjects retrieved ' + teacher_id, req.role, req.user_id);
+        res.status(200).json(subjects);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
     }
 }
-exports.removeClassFromTeacher = removeClassFromTeacher;
-exports.removeStudentsFromClass = removeStudentsFromClass;
-exports.addStudentsToClass = addStudentsToClass;
+
+
 exports.createBranch = createBranch;
 exports.readBranches = readBranches;
 exports.readBranchbyId = readBranchbyId;
 exports.updateBranch = updateBranch;
 exports.deleteBranch = deleteBranch;
 exports.AddClass = AddClass;
+exports.addStudentsToClass = addStudentsToClass;
+exports.changeStudentClass = changeStudentClass;
+exports.addSubjectToClass = addSubjectToClass;
 exports.assignTeacher = assignTeacher;
-exports.updateClass = updateClass;
-exports.deleteClass = deleteClass;
-exports.getClass = getClass;
+exports.changeSubjectTeacher = changeSubjectTeacher;
+exports.getStudentClassWithSubjects = getStudentClassWithSubjects;
+exports.getTeacherSubjects = getTeacherSubjects;
 
-exports.getClassbyId = getClassbyId;
-exports.getStudentClasses = getStudentClasses;
-exports.getTeacherClasses = getTeacherClasses;
-exports.getBranchClasses = getBranchClasses;
-exports.getBranchTeachers = getBranchTeachers;
-exports.getBranchStudents = getBranchStudents;
