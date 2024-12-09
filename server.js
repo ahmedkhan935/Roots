@@ -7,11 +7,13 @@ const authroutes = require('./routes/authRoute');
 const branchRoutes = require('./routes/branchRoute');
 const meritRoutes = require('./routes/meritRoute');
 const parentRoutes = require('./routes/parentRoute');
+const teacherRoutes = require('./routes/TeacherRoute');
 app.use(express.json());
 app.use('/api/auth', authroutes);
 app.use('/api/branch', branchRoutes);
 app.use('/api/merit', meritRoutes);
 app.use('/api/parent', parentRoutes);
+app.use('/api/teacher',teacherRoutes);
 app.use(cors());
 dotenv.config();
 connectDB().then(() => {

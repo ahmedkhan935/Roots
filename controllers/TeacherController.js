@@ -1,5 +1,6 @@
 const Classroom = require('../models/classroom');
 const { log } = require('../utils/logger');
+const AwardedMerit = require('../models/merit').AwardedPoints;
 
 // ...existing code...
 
@@ -378,8 +379,29 @@ const getAllClassesStudentActiveHomework = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+const getAwardedMeritPoints = async (req, res) => {
+    try {
+        const {id} = req.params;
+        teacher_id = id;
+        //find positive and negative merit points
+
+        const positive_merit_points = await AwardedMerit.find({awardedBy: teacher_id, points: {$gt: 0}});
+      
+        const negative_merit_points = await AwardedMerit.find({awardedBy: teacher_id, points: {$lt: 0}});
+
+
+        const sum_positive = positive_merit_points.reduce((a, b) => a + b.points, 0);
+        const sum_negative = negative_merit_points.reduce((a, b) => a + b.points, 0);
+        await log('Retrieved awarded merit points', 'teacher', req.user_id);
+        res.status(200).json({ positive_merit_points: sum_positive, negative_merit_points: sum_negative });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
 
 module.exports = {
+    getAwardedMeritPoints,
     addAnnouncement,
     getAnnouncements,
     updateAnnouncement,

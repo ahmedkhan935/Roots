@@ -343,6 +343,34 @@ const getTeacherSubjects = async (req, res) => {
     }
 }
 
+const getAwardedMeritsByBranch = async (req, res) => {
+    const branch_id = req.params.id;
+    console.log(branch_id); 
+    const { num_recent } = req.query;
+    try {
+        const awardedMerits = await AwardedPoints.find()
+            .populate({
+                path: 'studentId',
+                match: { branch_id: branch_id },
+                select: 'name rollNumber'
+            })
+            .sort({ date: -1 })
+            console.log(awardedMerits);
+
+            
+
+        // Filter out merits where studentId is null (i.e., no matching student found)
+        const filteredMerits = awardedMerits.filter(merit => merit.studentId !== null);
+
+        // If num_recent is provided, slice the array to get the most recent merits
+        const result = num_recent ? filteredMerits.slice(0, parseInt(num_recent)) : filteredMerits;
+
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 
 exports.createBranch = createBranch;
 exports.readBranches = readBranches;
@@ -357,4 +385,6 @@ exports.assignTeacher = assignTeacher;
 exports.changeSubjectTeacher = changeSubjectTeacher;
 exports.getStudentClassWithSubjects = getStudentClassWithSubjects;
 exports.getTeacherSubjects = getTeacherSubjects;
+exports.getAwardedMeritsByBranch = getAwardedMeritsByBranch;
+// exports.getAwardedMeritPoints = getAwardedMeritPoints;
 

@@ -96,5 +96,31 @@ export class BranchService {
       subject_id,
       teacher_id
     }, this.getAuthHeaders());
+
   }
+  stat
+
+  /**
+   * Get Recent activy of a branch
+   * @param {string} branch_id - Branch ID
+   * @queryParam {number} num_recent - Number of recent activities to fetch
+   **/
+  static async getAwardedMeritsByBranch(branch_id, num_recent) {
+    const params = {};
+    if (num_recent) {
+      params.num_recent = num_recent;
+    }
+    return axios.get(`${BASE_URL}/branch/recent/${branch_id}`, {
+      ...this.getAuthHeaders(),
+      params
+    });
+  }
+  /**
+   * Get awarded merit points by teacher ID
+   * @param {string} teacher_id - Teacher ID
+   */
+  static async getAwardedMeritPoints(teacher_id) {
+    return axios.get(`${BASE_URL}/teacher/merit/${teacher_id}`, this.getAuthHeaders());
+  }
+  
 }
