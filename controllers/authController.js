@@ -442,6 +442,225 @@ const getAdminBranch = async (req, res) => {
         res.status(500).json({ message: err });
     }
 }
+const getMeritReport = async (req, res) => {
+try {
+    const studentId = req.user_id;
+    
+    // Validate studentId format
+    // if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    //     return res.status(400).json({ message: 'Invalid student ID format' });
+    // }
+
+    // Get basic student info
+    const student = await Student.findById(studentId)
+        .select('name rollNumber class curr_merit_points')
+        .populate('class', 'name');
+
+    if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Get all awarded points for the student
+    const allPoints = await AwardedPoints.find({ 
+        studentId: studentId,
+        current: true 
+    })
+    .populate('awardedBy', 'name')
+    .sort('-date');
+
+    // Calculate total merits and demerits
+    const totalMerits = allPoints.reduce((sum, record) => 
+        record.points > 0 ? sum + record.points : sum, 0);
+    const totalDemerits = Math.abs(allPoints.reduce((sum, record) => 
+        record.points < 0 ? sum + record.points : sum, 0));
+
+    // Group points by month for history
+    const monthlyHistory = allPoints.reduce((acc, record) => {
+        const month = new Date(record.date).toLocaleString('en-US', { month: 'short' });
+        if (!acc[month]) {
+            acc[month] = { month, merits: 0, demerits: 0, net: 0 };
+        }
+        if (record.points > 0) {
+            acc[month].merits += record.points;
+        } else {
+            acc[month].demerits += Math.abs(record.points);
+        }
+        acc[month].net = acc[month].merits - acc[month].demerits;
+        return acc;
+    }, {});
+
+    // Convert monthly history to array and sort by recent months
+    const meritHistory = Object.values(monthlyHistory)
+        .sort((a, b) => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return months.indexOf(b.month) - months.indexOf(a.month);
+        });
+
+    // Format detailed records
+    const meritRecords = allPoints.map(record => ({
+        id: record._id,
+        date: record.date.toISOString().split('T')[0],
+        type: record.points > 0 ? 'merit' : 'violation',
+        points: record.points,
+        category: record.reason,
+        description: record.reason,
+        issuedBy: record.awardedBy.name
+    }));
+
+    // Group points by category
+    const meritCategories = allPoints.reduce((acc, record) => {
+        const category = record.reason;
+        if (!acc[category]) {
+            acc[category] = 0;
+        }
+        acc[category] += Math.abs(record.points);
+        return acc;
+    }, {});
+
+    // Format response
+    const response = {
+        student: {
+            id: student._id,
+            name: student.name,
+            class: student.class.name,
+            rollNumber: student.rollNumber,
+            totalMeritPoints: totalMerits,
+            totalDemerits: totalDemerits,
+            netPoints: student.curr_merit_points
+        },
+        meritHistory,
+        meritRecords,
+        meritCategories: Object.entries(meritCategories).map(([category, points]) => ({
+            category,
+            points
+        }))
+    };
+
+    res.status(200).json(response);
+
+} catch (error) {
+    console.error('Error in getMeritReport:', error);
+    res.status(500).json({ 
+        message: 'Error retrieving merit report',
+        error: error.message 
+    });
+}
+};
+async function calculateMonthlyTrend(studentId) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    
+    studentId = studentId.toString();
+    return await Promise.all(months.map(async (month, index) => {
+        // Set date range for the entire month
+        const startDate = new Date(currentYear, index, 1);
+        const endDate = new Date(currentYear, index + 1, 0); // Last day of the month
+
+        // Get all awarded points for this student in this period
+        const monthData = await AwardedPoints.find({
+            studentId: studentId,
+            date: { $gte: startDate, $lte: endDate },
+            current: true
+        });
+        
+        // Calculate merits and violations
+        const merits = monthData
+            .filter(d => d.points > 0)
+            .reduce((sum, d) => sum + d.points, 0);
+
+        const violations = monthData
+            .filter(d => d.points < 0)
+            .reduce((sum, d) => sum + Math.abs(d.points), 0);
+
+        return {
+            month,
+            merits,
+            violations,
+            netPoints: merits - violations
+        };
+    }));
+}
+
+const getMeritPointsData = async (req, res) => {
+    try {
+       const studentId = req.user_id;
+
+        // Validate student exists
+        const student = await Student.findById(studentId);
+        if (!student) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Student not found' 
+            });
+        }
+
+        // Get awarded points history from database
+        const pointsHistory = await AwardedPoints.find({ 
+            studentId: studentId,
+            current: true
+        })
+        .populate('awardedBy', 'name')
+        .sort({ date: -1 })
+        .lean();
+
+        // Transform the database records to match the required format
+        const formattedHistory = pointsHistory.map(record => ({
+            id: record._id,
+            date: record.date.toISOString().split('T')[0],
+            type: record.points > 0 ? 'Merit' : 'Demerit',
+            points: record.points,
+            reason: record.reason,
+            awardedBy: record.awardedBy.name,
+            category: record.category || 'Academic' // Default category if not specified
+        }));
+
+        // Get monthly trend data
+        const trendData = await calculateMonthlyTrend(studentId);
+
+        // Return all required data
+        return res.status(200).json({
+            success: true,
+            data: {
+                currentPoints: student.curr_merit_points,
+                pointsHistory: formattedHistory,
+                trendData: trendData,
+                categories: ["All", "Academic", "Discipline", "Extra Curricular"],
+                pointTypes: ["All", "Merit", "Demerit"]
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in getMeritPointsData:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+const updateStudentPassword = async (req, res) => {
+    const { password } = req.body;
+    try {
+        const student = await Student.findById(req.user_id);
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        student.password = hashedPassword;
+        await student.save();
+
+        log('updated password','student',req.user_id);
+        res.status(200).json({ message: 'Password updated successfully' });
+    }
+
+    catch (err) {
+        res.status(500).json({ message: err });
+    }
+}
+exports.updateStudentPassword = updateStudentPassword;
+exports.getFilteredPointsHistory = getMeritPointsData;
+exports.getMeritReport = getMeritReport;
 exports.getAdminBranch = getAdminBranch;
 exports.getAllStudents = getAllStudents;
 
