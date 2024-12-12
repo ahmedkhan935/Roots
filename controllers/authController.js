@@ -338,5 +338,109 @@ const deleteUser = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+const calculateAttendance = async (studentId) => {
+    // Placeholder - implement your attendance calculation logic
+    return '95%';
+};
+
+// Helper function to calculate rank based on merit points
+const calculateRank = (students) => {
+    const sortedStudents = [...students].sort((a, b) => b.curr_merit_points - a.curr_merit_points);
+    return sortedStudents.reduce((ranks, student, index) => {
+        ranks[student._id.toString()] = index + 1;
+        return ranks;
+    }, {});
+};
+
+// Helper function to get demerits (negative merit points)
+const getDemerits = async (studentId) => {
+    const demerits = await AwardedPoints.countDocuments({
+        studentId,
+        points: { $lt: 0 },
+        current: true
+    });
+    return demerits;
+};
+const AwardedPoints = require('../models/merit').AwardedPoints;
+const Classroom = require('../models/classroom');
+// Get all students with their current classes
+
+const getAllStudents = async (req, res) => {
+    try {
+        // Get all classrooms
+        const classrooms = await Classroom.find().populate('students');
+        
+        // Initialize result object
+        const result = {};
+        
+        // Get all students with their current classes
+        const allStudents = await Student.find()
+            .populate('class')
+            .lean();
+
+        // Process students by class
+        for (const classroom of classrooms) {
+            const className = classroom.name;
+            result[className] = [];
+            
+            // Filter students for this classroom
+            const classStudents = allStudents.filter(
+                student => student.class && student.class._id.equals(classroom._id)
+            );
+            
+            // Calculate ranks for this class
+            const rankMap = calculateRank(classStudents);
+            
+            // Process each student
+            for (const student of classStudents) {
+                const attendance = await calculateAttendance(student._id);
+                const demerits = await getDemerits(student._id);
+                
+                result[className].push({
+                    id: student._id,
+                    rollNo: student.rollNumber,
+                    name: student.name,
+                    class: className,
+                    meritPoints: student.curr_merit_points || 0,
+                    demerits: demerits,
+                    attendance: attendance,
+                    rank: rankMap[student._id.toString()],
+                    lastUpdated: student.updatedAt || new Date().toISOString().split('T')[0]
+                });
+            }
+        }
+        
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error in getAllStudents:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching students data',
+            error: error.message
+        });
+    }
+};
+const getAdminBranch = async (req, res) => {
+    const id = req.user_id;
+    
+    try{
+        const user  = await Branchadmin.findById(id);
+        if(!user)
+            return res.status(403).json({ message: 'Not authorized' });
+        console.log(user);
+        const branch = await Branch.findById(user.branch_id
+            );
+        console.log(branch);
+        if(!branch)
+            return res.status(403).json({ message: 'Not authorized' });
+        res.json(branch);
+
+    }
+    catch(err) {
+        res.status(500).json({ message: err });
+    }
+}
+exports.getAdminBranch = getAdminBranch;
+exports.getAllStudents = getAllStudents;
 
 exports.deleteUser = deleteUser;

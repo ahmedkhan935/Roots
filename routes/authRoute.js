@@ -4,6 +4,8 @@ const authController = require('../controllers/authController');
 const { verifyToken,verifyAdmin, verifyBranchAdmin } = require('../middlewares/auth');
 
 // ...existing code...
+router.get("/student",verifyToken,authController.getAllStudents);
+router.get("/get-admin-branch",verifyToken,authController.getAdminBranch);
 router.post('/register/superadmin', authController.createSuperadmin);
 router.post('/register/branchadmin',verifyToken,verifyAdmin, authController.createBranchadmin);
 router.post('/register/teacher',verifyToken,verifyBranchAdmin, authController.createTeacher);
@@ -18,5 +20,6 @@ router.put('/:role/:id',verifyToken,authController.selectMiddleware, authControl
 router.delete('/:role/:id',verifyToken,authController.selectMiddleware, authController.deleteUser);
 router.get('/:role',verifyToken,authController.selectMiddleware, authController.getAllUsers);
 router.get('/:role/:id',verifyToken,authController.selectMiddleware, authController.getUserById);
+
 
 module.exports = router;
