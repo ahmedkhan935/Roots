@@ -9,7 +9,10 @@ const {
     getStudentPoints,
     getMeritStats,
     deleteDemeritTemplate,
-    deleteMeritTemplate
+    deleteMeritTemplate,
+    getMeritSystemData,
+    getMeritAnalytics,
+    getChildrenMeritData
 } = require('../controllers/meritController');
 const { 
     verifyToken, 
@@ -62,4 +65,7 @@ router.get('/merit-stats',verifyToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+router.get("/teacher/merit-stats",verifyToken,getMeritSystemData   );
+router.get("/teacher/merit-stats2",verifyToken,getMeritAnalytics   );
+router.get("/parent/merit-stats",verifyToken,getChildrenMeritData   );
 module.exports = router;
