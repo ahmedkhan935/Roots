@@ -7,7 +7,9 @@ const {
     getMeritTemplates,
     getDemeritTemplates,
     getStudentPoints,
-    getMeritStats
+    getMeritStats,
+    deleteDemeritTemplate,
+    deleteMeritTemplate
 } = require('../controllers/meritController');
 const { 
     verifyToken, 
@@ -24,6 +26,8 @@ router.post('/merit-template', verifyToken, verifyBranchAdmin, createMeritTempla
 router.post('/demerit-template', verifyToken, verifyBranchAdmin, createDemeritTemplate);
 router.get('/merit-templates', verifyToken, getMeritTemplates);
 router.get('/demerit-templates', verifyToken, getDemeritTemplates);
+router.delete('/merit-template/:id', verifyToken, verifyBranchAdmin, deleteMeritTemplate);
+router.delete('/demerit-template/:id', verifyToken, verifyBranchAdmin, deleteDemeritTemplate);
 
 // Points routes
 router.post('/award-points', verifyToken, async (req, res, next) => {
