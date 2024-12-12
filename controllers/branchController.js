@@ -1,4 +1,5 @@
 const Branch = require("../models/branch");
+const branchadmin = require("../models/branchadmin");
 const Classroom = require("../models/classroom");
 const { AwardedPoints } = require("../models/merit");
 const Student = require("../models/student");
@@ -560,13 +561,16 @@ const addStudentsToClass = async (req, res) => {
 
 // Change student's class
 const changeStudentClass = async (req, res) => {
-  const { student_id, new_class_id } = req.body;
-  if (!student_id || !new_class_id) {
+  const { student_id, new_class_name } = req.body;
+  if (!student_id || !new_class_name) {
     return res
       .status(400)
       .json({ message: "Student ID and new class ID are required" });
   }
   try {
+    const classroom = await
+    Classroom.findOne({ name: new_class_name });
+    const new_class_id = classroom._id;
     const student = await Student.findById(student_id);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
@@ -868,6 +872,43 @@ const getAwardedMeritsByBranch = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+const getBranchTeachers = async (req, res) => {
+    const admin_id = req.user_id;
+    try {
+        const branch = await branchadmin.findById(admin_id);
+        if (!branch) {
+            return res.status(404).json({ message: 'Branch admin not found' });
+        }
+        const teachers = await Teacher.find({ branch_id: branch.branch_id });
+        if (!teachers.length) {
+            return res.status(404).json({ message: 'No teachers found' });
+        }
+        log('Teachers retrieved ' + branch.branch_id, 'branchadmin', req.user_id);
+        res.status(200).json(teachers);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+}
+const getBranchStudents = async (req, res) => {
+    const admin_id = req.user_id;
+    try {
+        const branch = await branchadmin.findById(admin_id);
+        if (!branch) {
+            return res.status(404).json({ message: 'Branch admin not found' });
+        }
+        const students = await Student.find({ branch_id: branch.branch_id });
+        if (!students.length) {
+            return res.status(404).json({ message: 'No students found' });
+        }
+        log('Students retrieved ' + branch.branch_id, 'branchadmin', req.user_id);
+        res.status(200).json(students);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+}
+exports.getBranchTeachers = getBranchTeachers;
+exports.getBranchStudents = getBranchStudents;
 
 exports.createBranch = createBranch;
 exports.readBranches = readBranches;

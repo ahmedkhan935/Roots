@@ -701,7 +701,7 @@ const getChildrenMeritData=async (req, res)=> {
               date: record.date.toISOString().split('T')[0],
               type: record.points > 0 ? 'merit' : 'violation',
               points: record.points,
-              class: '', // Add class info if available
+              class: classroom.name, // Add class info if available
               reason: record.reason,
               issuedBy: record.awardedBy ? record.awardedBy.name : ''
           }));

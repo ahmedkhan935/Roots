@@ -5,6 +5,8 @@ const { verifyToken, verifyAdmin, verifyBranchAdmin } = require('../middlewares/
 const branchController = require('../controllers/branchController');
 
 // Existing routes
+router.get("/teacher/data",verifyToken,branchController.getBranchTeachers);
+router.get("/student/data",verifyToken,branchController.getBranchStudents);
 router.post('/', verifyToken, verifyAdmin, branchController.createBranch);
 router.get('/', verifyToken, verifyAdmin, branchController.readBranches);
 router.get('/:id', verifyToken, verifyAdmin, branchController.readBranchbyId);

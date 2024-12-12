@@ -369,7 +369,7 @@ const Classroom = require('../models/classroom');
 
 const getAllStudents = async (req, res) => {
     try {
-        // Get all classrooms
+
         const classrooms = await Classroom.find().populate('students');
         
         // Initialize result object
