@@ -17,7 +17,7 @@ const Schema = mongoose.Schema;
 // });
 const SubjectSchema = new Schema({
     name: { type: String, required: true },
-    teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' },
+    teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
     // assignments: [{
     //     title: { type: String, required: true },
     //     content: { type: String, required: true },
