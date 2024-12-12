@@ -473,16 +473,16 @@ const AddClass = async (req, res) => {
 
 // Add students to a class
 const addStudentsToClass = async (req, res) => {
-    const { class_id, student_ids } = req.body;
-    if (!class_id || !student_ids || !Array.isArray(student_ids)) {
+    const { class_name, student_ids } = req.body;
+    if (!class_name || !student_ids || !Array.isArray(student_ids)) {
         return res.status(400).json({ message: 'Class ID and array of student IDs are required' });
     }
     try {
-        const classroom = await Classroom.findById(class_id);
+        const classroom = await Classroom.findOne({ name: class_name });
         if (!classroom) {
             return res.status(404).json({ message: 'Class not found' });
         }
-
+        const class_id = classroom._id;
         // Update students' class reference
         await Student.updateMany(
             { _id: { $in: student_ids } },
@@ -553,7 +553,71 @@ const changeStudentClass = async (req, res) => {
         res.status(400).json({ message: err.message });
     }
 }
+const getClasses=  async (req, res) => {
+    try {
+        // Get branch_id from request query or params
+        const { branch_id } = req.params;
 
+        if (!branch_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Branch ID is required'
+            });
+        }
+
+        // Fetch classrooms with populated subjects and teacher information
+        const classrooms = await Classroom.find({ branch_id })
+            .populate({
+                path: 'subjects.teacher',
+                model: 'Teacher',
+                select: 'name'
+            })
+            .populate({
+                path: 'students',
+                select: '_id'
+            });
+
+        // Transform the data to match the required format
+        const formattedClasses = await Promise.all(classrooms.map(async (classroom) => {
+            // Extract grade and section from class name (assuming format like "10-A")
+            const [grade, section] = classroom.name.split('-');
+            
+            // Get class teacher (first teacher in the subjects array)
+            const classTeacher = classroom.subjects[0]?.teacher?.name || 'Not Assigned';
+            
+            // Get unique subject names
+            const subjects = [...new Set(classroom.subjects.map(subject => subject.name))];
+
+            return {
+                id: classroom._id,
+                name: classroom.name,
+                section: section || 'N/A',
+                grade: grade || 'N/A',
+                classTeacher: classTeacher,
+                capacity: 30, // You might want to make this configurable
+                currentStrength: classroom.students.length,
+                subjects: subjects,
+                schedule: "Morning", // You might want to add this to your schema
+                room: "Not Assigned", // You might want to add this to your schema
+                academicYear: new Date().getFullYear() + "-" + (new Date().getFullYear() + 1).toString().substr(-2)
+            };
+        }));
+
+        return res.status(200).json({
+            success: true,
+            data: formattedClasses,
+            message: 'Classes retrieved successfully'
+        });
+
+    } catch (error) {
+        console.error('Error in getClasses:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+}
 // Add subject to class
 const addSubjectToClass = async (req, res) => {
     const { class_id, subject_name } = req.body;
@@ -703,7 +767,7 @@ const getTeacherSubjects = async (req, res) => {
         const subjects = classes.map(classroom => ({
             class_name: classroom.name,
             subjects: classroom.subjects.filter(subject => 
-                subject.teacherId && subject.teacherId.toString() === teacher_id
+                subject.teacher && subject.teacher.toString() === teacher_id
             )
         }));
 
@@ -757,5 +821,6 @@ exports.changeSubjectTeacher = changeSubjectTeacher;
 exports.getStudentClassWithSubjects = getStudentClassWithSubjects;
 exports.getTeacherSubjects = getTeacherSubjects;
 exports.getAwardedMeritsByBranch = getAwardedMeritsByBranch;
+exports.getClasses=getClasses;
 // exports.getAwardedMeritPoints = getAwardedMeritPoints;
 

@@ -120,7 +120,7 @@ const createTeacher = async (req, res) => {
 exports.createTeacher = createTeacher;
 
 const createStudent = async (req, res) => {
-    const { name, email, password, rollNumber, dateOfBirth, grade, branch_id,cnic,address,contactNumber,age } = req.body;
+    const { name, email, password, rollNumber, dateOfBirth, grade, branch_id,cnic,address,contactNumber,age,class_name} = req.body;
     try {
         const existingUser = await Student
             .findOne({ email })
@@ -131,9 +131,11 @@ const createStudent = async (req, res) => {
         if(!branch) {
             return res.status(400).json({ message: 'Branch not found' });
         }
+        const classroom = await Classroom.findOne({name:class_name});
+        
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newStudent = new Student({ name, email, password: hashedPassword, rollNumber, dateOfBirth, grade, branch_id,cnic,address,contactNumber,age });
+        const newStudent = new Student({ name, email, password: hashedPassword, rollNumber, dateOfBirth, grade, branch_id,cnic,address,contactNumber,age,class:classroom._id });
         await newStudent.save();
         branch.students.push(newStudent._id);
         await branch.save();
