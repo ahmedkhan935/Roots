@@ -7,6 +7,7 @@ const { verifyToken,verifyAdmin, verifyBranchAdmin } = require('../middlewares/a
 router.get("/student2",verifyToken,authController.getAllStudents);
 router.get("/student-dash",verifyToken,authController.getMeritReport);
 router.get("/student-dash2",verifyToken,authController.getFilteredPointsHistory);
+router.put("/update-student-pass",verifyToken,authController.updateStudentPassword);
 router.get("/get-admin-branch",verifyToken,authController.getAdminBranch);
 router.post('/register/superadmin', authController.createSuperadmin);
 router.post('/register/branchadmin',verifyToken,verifyAdmin, authController.createBranchadmin);
