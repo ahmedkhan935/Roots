@@ -25,4 +25,5 @@ router.put('/class/change-teacher', verifyToken, verifyBranchAdmin, branchContro
 router.get('/student/class/:student_id', verifyToken, branchController.getStudentClassWithSubjects);
 router.get('/teacher/subjects/:teacher_id', verifyToken, branchController.getTeacherSubjects);
 router.get('/recent/:id', verifyToken, branchController.getAwardedMeritsByBranch);
+router.get("/classes/:branch_id",verifyToken,branchController.getClasses);
 module.exports = router;
