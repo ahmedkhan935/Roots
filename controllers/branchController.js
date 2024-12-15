@@ -31,7 +31,8 @@ const readBranches = async (req, res) => {
     // Get all branches with their teachers and students
     const branches = await Branch.find({})
       .populate("teachers")
-      .populate("students");
+      .populate("students")
+    
 
     if (!branches.length) {
       return res.status(404).json({ message: "No branches found" });
@@ -408,7 +409,7 @@ async function getTopStudents(students, meritPoints) {
       violations,
     };
   });
-
+  
   return studentPoints.sort((a, b) => b.points - a.points).slice(0, 5);
 }
 

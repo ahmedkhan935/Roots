@@ -3,40 +3,70 @@ const {
   DemeritTemplate,
   AwardedPoints,
 } = require("../models/merit");
+const { sendPointsEmail } = require("../utils/email");
 const student = require("../models/student");
 // Award points to a student
 const awardPoints = async (req, res) => {
   try {
-    const { studentId, points, reason,comments } = req.body;
+    const { studentId, points, reason, comments } = req.body;
+    
     if (!studentId || !points || !reason) {
       return res.status(400).json({ message: "All fields are required" });
     }
+
     const existingStudent = await student.findById(studentId);
     if (!existingStudent) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    awardedBy = req.user_id;
-    var awardedByModel;
+    const awardedBy = req.user_id;
+    const awardedByModel = req.role === "teacher" ? "Teacher" : "Branchadmin";
 
-    if (req.role === "teacher") {
-      awardedByModel = "Teacher";
+    // Get awarder details
+    const awarder = await (awardedByModel === "Teacher" 
+      ? Teacher.findById(awardedBy) 
+      : Branchadmin.findById(awardedBy));
+
+    const classOfStudent = await Classroom.findById(existingStudent.class);
+    console.log(classOfStudent);
+    if (!classOfStudent) {
+      return res.status(404).json({ message: "Class not found" });
     }
-    if (req.role === "branchadmin") {
-      awardedByModel = "Branchadmin";
-    }
+
+    //class is a combination of grade-section e.g. 1-A, 2-B
+    //get grade and section from class
+    const classArray = classOfStudent.name.split("-");
+    const grade = classArray[0];
+    const section = classArray[1];
+
+    console.log(grade, section);
+
+
     const awardedPoints = new AwardedPoints({
       studentId,
       points,
       reason,
       awardedBy,
       awardedByModel,
-      comments
+      comments,
     });
+    
     existingStudent.curr_merit_points += points;
     await existingStudent.save();
-
     await awardedPoints.save();
+    
+    // Send email notification
+    await sendPointsEmail(
+      existingStudent.email,
+      `${existingStudent.name}`,
+      points,
+      reason,
+      `${awarder.name}`,
+      awardedByModel,
+      comments,
+      grade
+    );
+
     res.status(201).json(awardedPoints);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -475,20 +505,26 @@ const getMeritSystemData = async (req, res) => {
                   studentId: student._id,
                   current: true,
                   points: { $gt: 0 }
-              }).countDocuments();
+              });
+
+              const totalMeritPoints = meritPoints.reduce((sum, p) => sum + p.points, 0);
 
               const demerits = await AwardedPoints.find({
                   studentId: student._id,
                   current: true,
                   points: { $lt: 0 }
-              }).countDocuments();
+              });
+
+              const totalDemerits = demerits.reduce((sum, p) => sum + Math.abs(p.points), 0);
+
+              console.log(meritPoints, demerits);
 
               return {
                   id: student._id,
                   rollNo: student.rollNumber,
                   name: student.name,
-                  meritPoints: student.curr_merit_points,
-                  demerits: Math.abs(demerits)
+                  meritPoints: totalMeritPoints,
+                  demerits: totalDemerits
               };
           }));
 

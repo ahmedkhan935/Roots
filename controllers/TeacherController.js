@@ -393,6 +393,8 @@ const getAwardedMeritPoints = async (req, res) => {
         const sum_positive = positive_merit_points.reduce((a, b) => a + b.points, 0);
         const sum_negative = negative_merit_points.reduce((a, b) => a + b.points, 0);
         await log('Retrieved awarded merit points', 'teacher', req.user_id);
+        console.log(sum_positive);
+        console.log(sum_negative);
         res.status(200).json({ positive_merit_points: sum_positive, negative_merit_points: sum_negative });
 
     } catch (error) {
