@@ -19,6 +19,7 @@ const awardPoints = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
+
     const awardedBy = req.user_id;
     const awardedByModel = req.role === "teacher" ? "Teacher" : "Branchadmin";
 
@@ -49,6 +50,7 @@ const awardPoints = async (req, res) => {
       awardedBy,
       awardedByModel,
       comments,
+      className: classOfStudent.name,
     });
     
     existingStudent.curr_merit_points += points;
@@ -216,6 +218,7 @@ async function calculateMonthlyTrend(branchId) {
       // Get all awarded points for this period
       const monthData = await AwardedPoints.find({
         date: { $gte: startDate, $lte: endDate },
+        current:true
       }).populate({
         path: "awardedBy",
         select: "branch_id",
@@ -308,44 +311,103 @@ async function getTopStudents(students, meritPoints) {
 }
 
 // Helper function for recent activity
+// async function getRecentActivity(branchId) {
+//   return await AwardedPoints.find({current:true})
+//     .populate({
+//       path: "awardedBy",
+//       select: "name branch_id",
+//     })
+//     .populate({
+//       path: "studentId",
+//       select: "name class",
+//       populate: {
+//         path: "class",
+//         select: "name",
+//       }
+//     })
+//     .sort({ date: -1 })
+//     .limit(5)
+//     .then((activities) =>
+//       activities
+//         .filter(
+//           (activity) =>
+//             activity.awardedBy &&
+//             activity.awardedBy.branch_id &&
+//             activity.awardedBy.branch_id.toString() === branchId
+//         )
+//         .map((activity) => ({
+//           id: activity._id,
+//           date: activity.date.toISOString().split("T")[0],
+//           student: activity.studentId?.name || "Unknown Student",
+//           class: activity.studentId?.class.name || "Unknown Class",
+//           type: activity.points > 0 ? "merit" : "violation",
+//           points: Math.abs(activity.points),
+//           reason: activity.reason,
+//           teacher:
+//             activity.awardedByModel === "Teacher"
+//               ? activity.awardedBy.name
+//               : null,
+//           admin:
+//             activity.awardedByModel === "Branchadmin"
+//               ? activity.awardedBy.name
+//               : null,
+//         }))
+//     );
+// }
 async function getRecentActivity(branchId) {
-  return await AwardedPoints.find()
-    .populate({
-      path: "awardedBy",
-      select: "name branch_id",
-    })
-    .populate({
-      path: "studentId",
-      select: "name class",
-    })
-    .sort({ date: -1 })
-    .limit(5)
-    .then((activities) =>
-      activities
-        .filter(
-          (activity) =>
-            activity.awardedBy &&
-            activity.awardedBy.branch_id &&
-            activity.awardedBy.branch_id.toString() === branchId
-        )
-        .map((activity) => ({
-          id: activity._id,
-          date: activity.date.toISOString().split("T")[0],
-          student: activity.studentId?.name || "Unknown Student",
-          class: activity.studentId?.class || "Unknown Class",
-          type: activity.points > 0 ? "merit" : "violation",
-          points: Math.abs(activity.points),
-          reason: activity.reason,
-          teacher:
-            activity.awardedByModel === "Teacher"
-              ? activity.awardedBy.name
-              : null,
-          admin:
-            activity.awardedByModel === "Branchadmin"
-              ? activity.awardedBy.name
-              : null,
-        }))
-    );
+  try {
+    const activities = await AwardedPoints.find({ current: true })
+      .populate({
+        path: "awardedBy",
+        select: "name branch_id",
+      })
+      .populate({
+        path: "studentId",
+        select: "name class",
+        populate: {
+          path: "class",
+          select: "name",
+        },
+      })
+      .sort({ date: -1 })
+      .limit(5)
+      .lean()
+      .exec();
+      console.log(activities);
+
+    const filteredActivities = filterActivitiesByBranch(activities, branchId);
+    console.log(filteredActivities);
+    const formattedActivities = formatActivities(filteredActivities);
+    console.log(formattedActivities);
+
+    return formattedActivities;
+  } catch (error) {
+    console.error("Error fetching recent activity:", error);
+    throw error;
+  }
+}
+
+function filterActivitiesByBranch(activities, branchId) {
+  return activities.filter(
+    (activity) =>
+      activity.awardedBy &&
+      activity.awardedBy.branch_id &&
+      activity.awardedBy.branch_id.toString() === branchId.toString()
+  );
+}
+
+function formatActivities(activities) {
+  return activities.map((activity) => ({
+    id: activity._id,
+    date: activity.date.toISOString().split("T")[0],
+    student: activity.studentId?.name || "Unknown Student",
+    class: activity.studentId?.class?.name || "Unknown Class",
+    type: activity.points > 0 ? "merit" : "violation",
+    points: Math.abs(activity.points),
+    reason: activity.reason,
+    teacher: activity.awardedByModel === "Teacher" ? activity.awardedBy.name : null,
+    admin: activity.awardedByModel === "Branchadmin" ? activity.awardedBy.name : null,
+  }));
 }
 
 // Helper function for teacher statistics
@@ -353,6 +415,7 @@ async function calculateTeacherStats(teacherId) {
   const teacherPoints = await AwardedPoints.find({
     awardedBy: teacherId,
     awardedByModel: "Teacher",
+    current:true
   });
 
   const meritsAwarded = teacherPoints.filter((p) => p.points > 0).length;
@@ -413,7 +476,7 @@ const getMeritStats = async (branchId) => {
     const [classrooms, students, allMeritPoints] = await Promise.all([
       Classroom.find({ branch_id: branchId }).populate("students"),
       Student.find({ branch_id: branchId }).populate("class"),
-      AwardedPoints.find().populate("studentId").populate({
+      AwardedPoints.find({current:true}).populate("studentId").populate({
         path: "awardedBy",
         select: "name branch_id",
       }),
@@ -438,6 +501,7 @@ const getMeritStats = async (branchId) => {
         getRecentActivity(branchId),
         calculateViolationTypes(branchMeritPoints),
       ]);
+      console.log(recentRecords);
 
     // Get class-wise statistics
     const classWiseStats = await Promise.all(
@@ -759,7 +823,33 @@ const getChildrenMeritData=async (req, res)=> {
       });
   }
 };
+const getLatestMeritData = async (req, res) => {
+  try {
+    const user_id = req.user_id;
+    const user = await Student.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    const latestData = await AwardedPoints.find({
+      studentId: user_id,
+      current: true,
+      points: { $gt: 0 },
+    })
+      .populate("awardedBy")
+      .sort({ date: -1 })
+      .limit(1);
+    //get the last awarded points
+    const lastAwardedPoints = latestData[0];
+    res.json(lastAwardedPoints);
+  }
+
+  catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = {
+  getLatestMeritData,
   createMeritTemplate,
   createDemeritTemplate,
   awardPoints,

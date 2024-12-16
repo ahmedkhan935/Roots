@@ -12,7 +12,8 @@ const {
     deleteMeritTemplate,
     getMeritSystemData,
     getMeritAnalytics,
-    getChildrenMeritData
+    getChildrenMeritData,
+    getLatestMeritData
 } = require('../controllers/meritController');
 const { 
     verifyToken, 
@@ -68,4 +69,5 @@ router.get('/merit-stats',verifyToken, async (req, res) => {
 router.get("/teacher/merit-stats",verifyToken,getMeritSystemData   );
 router.get("/teacher/merit-stats2",verifyToken,getMeritAnalytics   );
 router.get("/parent/merit-stats",verifyToken,getChildrenMeritData   );
+router.get("/student/latest-merit",verifyToken,getLatestMeritData);
 module.exports = router;

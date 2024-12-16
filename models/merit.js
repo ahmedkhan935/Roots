@@ -23,6 +23,7 @@ const AwardedPointsSchema = new Schema({
     points: { type: Number, required: true },
     reason: { type: String, required: true },
     comments:{  type: String},
+    className  : {type: String},
     awardedBy: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,

@@ -198,4 +198,86 @@ const sendPointsEmail = async (
   }
 };
 
-module.exports = { sendPointsEmail };
+const getPasswordEmailTemplate = (email, password) => {
+  return {
+    subject: "Your New Password",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            background-color: #a00c0c;
+            padding: 20px;
+            text-align: center;
+            color: #ffffff;
+          }
+          .content {
+            padding: 30px;
+            color: #333333;
+          }
+          .footer {
+            background-color: #a00c0c;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Password Reset</h1>
+          </div>
+          <div class="content">
+            <p>Dear User,</p>
+            <p>Your password has been reset. Please use the following password to log in:</p>
+            <p><strong>${password}</strong></p>
+            <p>If you did not request a password reset, please contact support immediately.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `.trim(),
+  };
+};
+const sendPasswordEmail = async (email, password) => {
+  try {
+    const { subject, html } = getPasswordEmailTemplate(email, password);
+
+    await transporter.sendMail({
+      from: process.env.SMTP_EMAIL,
+      to: email,
+      subject,
+      html,
+    });
+    console.log("Email sent successfully");
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+module.exports = { sendPointsEmail, };

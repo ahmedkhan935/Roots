@@ -1,6 +1,7 @@
 const Branch = require("../models/branch");
 const branchadmin = require("../models/branchadmin");
 const Classroom = require("../models/classroom");
+const { populate } = require("../models/logs");
 const { AwardedPoints } = require("../models/merit");
 const Student = require("../models/student");
 const Teacher = require("../models/teacher");
@@ -29,11 +30,14 @@ const createBranch = async (req, res) => {
 const readBranches = async (req, res) => {
   try {
     // Get all branches with their teachers and students
-    const branches = await Branch.find({})
-      .populate("teachers")
-      .populate("students")
-    
-
+      const branches = await Branch.find({})
+        .populate("teachers")
+        .populate({
+            path: "students",
+            populate: {
+                path: "class"
+            }
+        });
     if (!branches.length) {
       return res.status(404).json({ message: "No branches found" });
     }
@@ -197,7 +201,10 @@ const readBranchbyId = async (req, res) => {
     // Get basic branch info
     const branch = await Branch.findById(branchId)
       .populate("teachers")
-      .populate("students");
+      .populate({
+        path:"students",
+        populate:"class"
+      });
 
     if (!branch) {
       return res.status(404).json({ message: "Branch not found" });
@@ -217,7 +224,13 @@ const readBranchbyId = async (req, res) => {
     const meritPoints = await AwardedPoints.find({
       studentId: { $in: branch.students.map((s) => s._id) },
       current: true,
-    }).populate("studentId");
+    }).populate({
+      path:"studentId",
+      populate:{
+        path:"class",
+        select:"name"
+      }
+    });
 
     // Calculate monthly trends (last 5 months)
     const monthlyTrend = await calculateMonthlyTrend(branchId);
@@ -322,6 +335,7 @@ async function calculateMonthlyTrend(branchId) {
       // Get all awarded points for this period
       const monthData = await AwardedPoints.find({
         date: { $gte: startDate, $lte: endDate },
+        current : true
       }).populate({
         path: "awardedBy",
         select: "branch_id",
@@ -403,7 +417,7 @@ async function getTopStudents(students, meritPoints) {
     return {
       id: student._id,
       name: student.name,
-      class: student.class,
+      class: student.class.name,
       points: totalPoints,
       merits,
       violations,
@@ -415,7 +429,7 @@ async function getTopStudents(students, meritPoints) {
 
 // Helper function for recent activity
 async function getRecentActivity(branchId) {
-  return await AwardedPoints.find()
+  return await AwardedPoints.find({ current: true })
     .populate({
       path: "awardedBy",
       select: "name branch_id",
@@ -423,7 +437,13 @@ async function getRecentActivity(branchId) {
     .populate({
       path: "studentId",
       select: "name class",
+      populate: { 
+        path: "class",
+        select: "name"
+      }
+
     })
+    
     .sort({ date: -1 })
     .limit(5)
     .then((activities) =>
@@ -438,7 +458,7 @@ async function getRecentActivity(branchId) {
           id: activity._id,
           date: activity.date.toISOString().split("T")[0],
           student: activity.studentId?.name || "Unknown Student",
-          class: activity.studentId?.class || "Unknown Class",
+          class: activity.studentId?.class.name || "Unknown Class",
           type: activity.points > 0 ? "merit" : "violation",
           points: Math.abs(activity.points),
           reason: activity.reason,
@@ -459,6 +479,7 @@ async function calculateTeacherStats(teacherId) {
   const teacherPoints = await AwardedPoints.find({
     awardedBy: teacherId,
     awardedByModel: "Teacher",
+    current: true,
   });
 
   const meritsAwarded = teacherPoints.filter((p) => p.points > 0).length;
@@ -545,6 +566,8 @@ const addStudentsToClass = async (req, res) => {
 
     const prev_points = await AwardedPoints.find({
       student_id: { $in: student_ids },
+      current: true,
+
     });
     if (prev_points.length > 0) {
       await AwardedPoints.updateMany(
@@ -594,7 +617,7 @@ const changeStudentClass = async (req, res) => {
     student.curr_merit_points = 0;
     await student.save();
     await AwardedPoints.updateMany(
-      { student_id: student_id },
+      { studentId: student_id },
       { current: false }
     );
 
@@ -849,7 +872,7 @@ const getAwardedMeritsByBranch = async (req, res) => {
   console.log(branch_id);
   const { num_recent } = req.query;
   try {
-    const awardedMerits = await AwardedPoints.find()
+    const awardedMerits = await AwardedPoints.find({ current: true })
       .populate({
         path: "studentId",
         match: { branch_id: branch_id },

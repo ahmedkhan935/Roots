@@ -200,6 +200,7 @@ exports.createStudent = createStudent;
 
 const createParent = async (req, res) => {
   const { name, email, password, contactNumber, children, cnic } = req.body;
+  console.log(req.body);
   try {
     const existingUser = await Parent.findOne({ email });
     if (existingUser) {
@@ -230,6 +231,8 @@ const createParent = async (req, res) => {
     log("create Parent", "branchadmin", req.user_id);
     res.status(201).json({ message: "Parent created successfully" });
   } catch (err) {
+    console.log(err);
+    console.log(err.message);
     res.status(500).json({ message: err });
   }
 };
@@ -431,6 +434,7 @@ const getDemerits = async (studentId) => {
 };
 const AwardedPoints = require("../models/merit").AwardedPoints;
 const Classroom = require("../models/classroom");
+const { sendPasswordEmail } = require("../utils/email");
 // Get all students with their current classes
 
 const getAllStudents = async (req, res) => {
@@ -764,6 +768,30 @@ const updateStudentPassword = async (req, res) => {
     res.status(500).json({ message: err });
   }
 };
+const forgotStudentPassword = async (req, res) => { 
+  const { email } = req.body;
+  try {
+    const curr_student = await student.findOne({ email });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    const password = `default${curr_student.rollNumber}`;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    curr_student.password = hashedPassword;
+    await curr_student.save();
+    //send email using nodemailer
+    await sendPasswordEmail(curr_student.email, password);
+
+    log("updated password", "student", student._id);
+    //send email
+    res.status(200).json({ success: "Password updated successfully" });
+  }
+  catch (err) {
+    res.status(500).json({ error: err });
+  }
+
+};
+
 exports.updateStudentPassword = updateStudentPassword;
 exports.getFilteredPointsHistory = getMeritPointsData;
 exports.getMeritReport = getMeritReport;
@@ -771,3 +799,8 @@ exports.getAdminBranch = getAdminBranch;
 exports.getAllStudents = getAllStudents;
 
 exports.deleteUser = deleteUser;
+exports.getAllUsers = getAllUsers;
+exports.getUserById = getUser;
+exports.updateUser = updateUser;
+exports.selectMiddleware = selectMiddleware;
+exports.forgotStudentPassword = forgotStudentPassword;

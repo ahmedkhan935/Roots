@@ -6,6 +6,7 @@ const { verifyToken,verifyAdmin, verifyBranchAdmin } = require('../middlewares/a
 // ...existing code...
 router.get("/student2",verifyToken,authController.getAllStudents);
 router.get("/student-dash",verifyToken,authController.getMeritReport);
+router.post("/student/forgot-password",authController.forgotStudentPassword);
 router.get("/student-dash2",verifyToken,authController.getFilteredPointsHistory);
 router.put("/update-student-pass",verifyToken,authController.updateStudentPassword);
 router.get("/get-admin-branch",verifyToken,authController.getAdminBranch);
