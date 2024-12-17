@@ -35,6 +35,10 @@ const parentSchema = new mongoose.Schema({
     notifications: {
         type: [notificationsSchema],
         required: true
+    },
+    blocked: {
+        type: Boolean,
+        default: false
     }
 });
 

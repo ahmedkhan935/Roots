@@ -35,6 +35,11 @@ const loginUser = async (Model, req, res) => {
     else if (Model === Teacher) role = "teacher";
     else if (Model === Student) role = "student";
     else if (Model === Parent) role = "parent";
+    if (Model === Student || Model == Teacher) {
+      if (user.blocked) {
+        return res.status(400).json({ message: "Invalid credentials" });
+      }
+    }
 
     const token = jwt.sign(
       { user_id: user._id, role },
@@ -326,6 +331,8 @@ exports.getUserById = getUser;
 const updateUser = async (req, res) => {
   const { role, id } = req.params;
   const updates = req.body;
+  console.log(updates); 
+  console.log(role);
   try {
     let user;
     switch (role) {
@@ -369,6 +376,8 @@ const updateUser = async (req, res) => {
     log("updated user", req.role, req.user_id);
     res.status(200).json(user);
   } catch (err) {
+    console.log(err);
+    console.log(err.message);
     res.status(500).json({ message: err });
   }
 };
@@ -481,7 +490,7 @@ const getAllStudents = async (req, res) => {
 
         result[className].push({
           id: student._id,
-          rollNo: student.rollNumber,
+          rollNumber: student.rollNumber,
           name: student.name,
           class: className,
           meritPoints: totalMeritPoints,
@@ -490,6 +499,13 @@ const getAllStudents = async (req, res) => {
           rank: rankMap[student._id.toString()],
           lastUpdated:
             student.updatedAt || new Date().toISOString().split("T")[0],
+          cnic: student.cnic,
+          contactNumber: student.contactNumber,
+          email: student.email,
+          address: student.address,
+          blocked: student.blocked,
+          dateOfBirth: student.dateOfBirth.toISOString().split("T")[0],
+          classId: student.class._id,
         });
       }
     }

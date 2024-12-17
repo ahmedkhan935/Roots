@@ -52,6 +52,11 @@ const teacherSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    blocked: {
+        type: Boolean,
+        default: false
+    }
+    
 });
 
 module.exports = mongoose.model('Teacher', teacherSchema);
