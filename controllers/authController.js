@@ -190,7 +190,7 @@ const createStudent = async (req, res) => {
       address,
       contactNumber,
       age,
-      class: classroom._id,
+      class: "675b2c68b0a7b664b9a397a5",
     });
     await newStudent.save();
     branch.students.push(newStudent._id);
@@ -198,6 +198,7 @@ const createStudent = async (req, res) => {
     log("create Student", "branchadmin", req.user_id);
     res.status(201).json({ message: "Student created successfully" });
   } catch (err) {
+    console.log(err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -331,7 +332,7 @@ exports.getUserById = getUser;
 const updateUser = async (req, res) => {
   const { role, id } = req.params;
   const updates = req.body;
-  console.log(updates); 
+  console.log(updates);
   console.log(role);
   try {
     let user;
@@ -784,10 +785,10 @@ const updateStudentPassword = async (req, res) => {
     res.status(500).json({ message: err });
   }
 };
-const forgotStudentPassword = async (req, res) => { 
+const forgotStudentPassword = async (req, res) => {
   const { email } = req.body;
   try {
-    const curr_student = await student.findOne({ email });
+    const curr_student = await Student.findOne({ email });
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
@@ -801,11 +802,9 @@ const forgotStudentPassword = async (req, res) => {
     log("updated password", "student", student._id);
     //send email
     res.status(200).json({ success: "Password updated successfully" });
-  }
-  catch (err) {
+  } catch (err) {
     res.status(500).json({ error: err });
   }
-
 };
 
 exports.updateStudentPassword = updateStudentPassword;
