@@ -8,7 +8,7 @@ const teacherSchema = new mongoose.Schema({
     cnic: {
         type: String,
         required: true,
-        unique: true
+    
     },
     
     email: {

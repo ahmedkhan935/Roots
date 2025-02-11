@@ -9,7 +9,7 @@ const student = require("../models/student");
 const awardPoints = async (req, res) => {
   try {
     const { studentId, points, reason, comments } = req.body;
-    
+
     if (!studentId || !points || !reason) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -19,13 +19,12 @@ const awardPoints = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-
     const awardedBy = req.user_id;
     const awardedByModel = req.role === "teacher" ? "Teacher" : "Branchadmin";
 
     // Get awarder details
-    const awarder = await (awardedByModel === "Teacher" 
-      ? Teacher.findById(awardedBy) 
+    const awarder = await (awardedByModel === "Teacher"
+      ? Teacher.findById(awardedBy)
       : Branchadmin.findById(awardedBy));
 
     const classOfStudent = await Classroom.findById(existingStudent.class);
@@ -42,7 +41,6 @@ const awardPoints = async (req, res) => {
 
     console.log(grade, section);
 
-
     const awardedPoints = new AwardedPoints({
       studentId,
       points,
@@ -52,11 +50,11 @@ const awardPoints = async (req, res) => {
       comments,
       className: classOfStudent.name,
     });
-    
+
     existingStudent.curr_merit_points += points;
     await existingStudent.save();
     await awardedPoints.save();
-    
+
     // Send email notification
     await sendPointsEmail(
       existingStudent.email,
@@ -218,7 +216,7 @@ async function calculateMonthlyTrend(branchId) {
       // Get all awarded points for this period
       const monthData = await AwardedPoints.find({
         date: { $gte: startDate, $lte: endDate },
-        current:true
+        current: true,
       }).populate({
         path: "awardedBy",
         select: "branch_id",
@@ -373,7 +371,7 @@ async function getRecentActivity(branchId) {
       .limit(5)
       .lean()
       .exec();
-      console.log(activities);
+    console.log(activities);
 
     const filteredActivities = filterActivitiesByBranch(activities, branchId);
     console.log(filteredActivities);
@@ -405,8 +403,12 @@ function formatActivities(activities) {
     type: activity.points > 0 ? "merit" : "violation",
     points: Math.abs(activity.points),
     reason: activity.reason,
-    teacher: activity.awardedByModel === "Teacher" ? activity.awardedBy.name : null,
-    admin: activity.awardedByModel === "Branchadmin" ? activity.awardedBy.name : null,
+    teacher:
+      activity.awardedByModel === "Teacher" ? activity.awardedBy.name : null,
+    admin:
+      activity.awardedByModel === "Branchadmin"
+        ? activity.awardedBy.name
+        : null,
   }));
 }
 
@@ -415,7 +417,7 @@ async function calculateTeacherStats(teacherId) {
   const teacherPoints = await AwardedPoints.find({
     awardedBy: teacherId,
     awardedByModel: "Teacher",
-    current:true
+    current: true,
   });
 
   const meritsAwarded = teacherPoints.filter((p) => p.points > 0).length;
@@ -476,7 +478,7 @@ const getMeritStats = async (branchId) => {
     const [classrooms, students, allMeritPoints] = await Promise.all([
       Classroom.find({ branch_id: branchId }).populate("students"),
       Student.find({ branch_id: branchId }).populate("class"),
-      AwardedPoints.find({current:true}).populate("studentId").populate({
+      AwardedPoints.find({ current: true }).populate("studentId").populate({
         path: "awardedBy",
         select: "name branch_id",
       }),
@@ -501,7 +503,7 @@ const getMeritStats = async (branchId) => {
         getRecentActivity(branchId),
         calculateViolationTypes(branchMeritPoints),
       ]);
-      console.log(recentRecords);
+    console.log(recentRecords);
 
     // Get class-wise statistics
     const classWiseStats = await Promise.all(
@@ -547,280 +549,308 @@ const getMeritStats = async (branchId) => {
 
 const getMeritSystemData = async (req, res) => {
   try {
-      // Get teacher's classes and branch
-      const teacherId = req.user_id; // Assuming you have the authenticated teacher's ID
-      const teacher = await Teacher.findById(teacherId);
-      
-      if (!teacher) {
-          return res.status(404).json({ message: 'Teacher not found' });
-      }
+    // Get teacher's classes and branch
+    const teacherId = req.user_id; // Assuming you have the authenticated teacher's ID
+    const teacher = await Teacher.findById(teacherId);
 
-      // Get all classes taught by the teacher
-      const classesData = await Promise.all(teacher.classes.map(async (teacherClass) => {
-          const classroom = await Classroom.findById(teacherClass.class_id)
-              .populate('students', 'name rollNumber curr_merit_points');
-          
-          if (!classroom) return null;
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
 
-          // Get merit/demerit data for each student
-          const studentsData = await Promise.all(classroom.students.map(async (student) => {
-              // Get awarded points for the student
-              const meritPoints = await AwardedPoints.find({
-                  studentId: student._id,
-                  current: true,
-                  points: { $gt: 0 }
-              });
+    // Get all classes taught by the teacher
+    const classesData = await Promise.all(
+      teacher.classes.map(async (teacherClass) => {
+        const classroom = await Classroom.findById(
+          teacherClass.class_id
+        ).populate("students", "name rollNumber curr_merit_points");
 
-              const totalMeritPoints = meritPoints.reduce((sum, p) => sum + p.points, 0);
+        if (!classroom) return null;
 
-              const demerits = await AwardedPoints.find({
-                  studentId: student._id,
-                  current: true,
-                  points: { $lt: 0 }
-              });
+        // Get merit/demerit data for each student
+        const studentsData = await Promise.all(
+          classroom.students.map(async (student) => {
+            // Get awarded points for the student
+            const meritPoints = await AwardedPoints.find({
+              studentId: student._id,
+              current: true,
+              points: { $gt: 0 },
+            });
 
-              const totalDemerits = demerits.reduce((sum, p) => sum + Math.abs(p.points), 0);
+            const totalMeritPoints = meritPoints.reduce(
+              (sum, p) => sum + p.points,
+              0
+            );
 
-              console.log(meritPoints, demerits);
+            const demerits = await AwardedPoints.find({
+              studentId: student._id,
+              current: true,
+              points: { $lt: 0 },
+            });
 
-              return {
-                  id: student._id,
-                  rollNo: student.rollNumber,
-                  name: student.name,
-                  meritPoints: totalMeritPoints,
-                  demerits: totalDemerits
-              };
-          }));
+            const totalDemerits = demerits.reduce(
+              (sum, p) => sum + Math.abs(p.points),
+              0
+            );
 
-          return {
-              id: classroom._id,
-              name: classroom.name,
-              subject: teacherClass.subject_name,
-              students: studentsData.filter(s => s !== null)
-          };
-      }));
+            console.log(meritPoints, demerits);
 
-      // Get merit/demerit templates
-      const meritTemplates = await MeritTemplate.find();
-      const demeritTemplates = await DemeritTemplate.find();
+            return {
+              id: student._id,
+              rollNo: student.rollNumber,
+              name: student.name,
+              meritPoints: totalMeritPoints,
+              demerits: totalDemerits,
+            };
+          })
+        );
 
-      // Format merit categories
-      const meritCategories = [
-          ...meritTemplates.map(template => ({
-              id: template._id,
-              type: 'merit',
-              points: template.points,
-              category: 'Academic Excellence', // You might want to add a category field to your schema
-              reason: template.reason
-          })),
-          ...demeritTemplates.map(template => ({
-              id: template._id,
-              type: 'demerit',
-              points: -Math.abs(template.points), // Ensure demerit points are negative
-              category: 'Discipline', // You might want to add a category field to your schema
-              reason: template.reason
-          }))
-      ];
+        return {
+          id: classroom._id,
+          name: classroom.name,
+          subject: teacherClass.subject_name,
+          students: studentsData.filter((s) => s !== null),
+        };
+      })
+    );
 
-      // Format final response
-      const response = {
-          CLASSES: classesData.filter(c => c !== null),
-          STUDENTS: classesData.reduce((acc, classData) => {
-              if (classData) {
-                  acc[classData.name] = classData.students;
-              }
-              return acc;
-          }, {}),
-          MERIT_CATEGORIES: meritCategories
-      };
+    // Get merit/demerit templates
+    const meritTemplates = await MeritTemplate.find();
+    const demeritTemplates = await DemeritTemplate.find();
 
-      return res.status(200).json(response);
+    // Format merit categories
+    const meritCategories = [
+      ...meritTemplates.map((template) => ({
+        id: template._id,
+        type: "merit",
+        points: template.points,
+        category: "Academic Excellence", // You might want to add a category field to your schema
+        reason: template.reason,
+      })),
+      ...demeritTemplates.map((template) => ({
+        id: template._id,
+        type: "demerit",
+        points: -Math.abs(template.points), // Ensure demerit points are negative
+        category: "Discipline", // You might want to add a category field to your schema
+        reason: template.reason,
+      })),
+    ];
 
+    // Format final response
+    const response = {
+      CLASSES: classesData.filter((c) => c !== null),
+      STUDENTS: classesData.reduce((acc, classData) => {
+        if (classData) {
+          acc[classData.name] = classData.students;
+        }
+        return acc;
+      }, {}),
+      MERIT_CATEGORIES: meritCategories,
+    };
+
+    return res.status(200).json(response);
   } catch (error) {
-      console.error('Error in getMeritSystemData:', error);
-      return res.status(500).json({ 
-          message: 'Error fetching merit system data',
-          error: error.message 
-      });
+    console.error("Error in getMeritSystemData:", error);
+    return res.status(500).json({
+      message: "Error fetching merit system data",
+      error: error.message,
+    });
   }
 };
-const getMeritAnalytics=async (req, res) => {
+const getMeritAnalytics = async (req, res) => {
   try {
-      const { classId } = req.query;
-      const result = {};
+    const { classId } = req.query;
+    const result = {};
 
-      // If classId is provided, get data for specific class, otherwise get for all classes
-      const classrooms = classId 
-          ? [await Classroom.findById(classId)] 
-          : await Classroom.find();
+    // If classId is provided, get data for specific class, otherwise get for all classes
+    const classrooms = classId
+      ? [await Classroom.findById(classId)]
+      : await Classroom.find();
 
-      for (const classroom of classrooms) {
-          const classData = {
-              totalMerits: 0,
-              totalViolations: 0,
-              monthlyStats: [],
-              meritsByType: [],
-              violationsByType: [],
-              recentRecords: []
-          };
+    for (const classroom of classrooms) {
+      const classData = {
+        totalMerits: 0,
+        totalViolations: 0,
+        monthlyStats: [],
+        meritsByType: [],
+        violationsByType: [],
+        recentRecords: [],
+      };
 
-          // Get all students in the class
-          const students = await Student.find({ class: classroom._id });
-          const studentIds = students.map(student => student._id);
+      // Get all students in the class
+      const students = await Student.find({ class: classroom._id });
+      const studentIds = students.map((student) => student._id);
 
-          // Get all awarded points for students in this class
-          const awardedPoints = await AwardedPoints.find({
-              studentId: { $in: studentIds },
-              current: true
-          }).populate('studentId', 'name')
-              .sort({ date: -1 });
+      // Get all awarded points for students in this class
+      const awardedPoints = await AwardedPoints.find({
+        studentId: { $in: studentIds },
+        current: true,
+      })
+        .populate("studentId", "name")
+        .sort({ date: -1 });
 
-          // Process monthly statistics
-          const monthlyData = new Map();
-          const meritTypes = new Map();
-          const violationTypes = new Map();
+      // Process monthly statistics
+      const monthlyData = new Map();
+      const meritTypes = new Map();
+      const violationTypes = new Map();
 
-          for (const point of awardedPoints) {
-              const month = point.date.toLocaleString('default', { month: 'short' });
-              const monthKey = `${month}`;
-              
-              if (!monthlyData.has(monthKey)) {
-                  monthlyData.set(monthKey, { merits: 0, violations: 0 });
-              }
+      for (const point of awardedPoints) {
+        const month = point.date.toLocaleString("default", { month: "short" });
+        const monthKey = `${month}`;
 
-              if (point.points > 0) {
-                  monthlyData.get(monthKey).merits += point.points;
-                  classData.totalMerits += point.points;
-                  
-                  // Track merit types
-                  if (!meritTypes.has(point.reason)) {
-                      meritTypes.set(point.reason, 0);
-                  }
-                  meritTypes.set(point.reason, meritTypes.get(point.reason) + 1);
-              } else {
-                  monthlyData.get(monthKey).violations += Math.abs(point.points);
-                  classData.totalViolations += Math.abs(point.points);
-                  
-                  // Track violation types
-                  if (!violationTypes.has(point.reason)) {
-                      violationTypes.set(point.reason, 0);
-                  }
-                  violationTypes.set(point.reason, violationTypes.get(point.reason) + 1);
-              }
+        if (!monthlyData.has(monthKey)) {
+          monthlyData.set(monthKey, { merits: 0, violations: 0 });
+        }
 
-              // Add to recent records if within last 5
-              if (classData.recentRecords.length < 5) {
-                  classData.recentRecords.push({
-                      id: point._id,
-                      studentName: point.studentId.name,
-                      type: point.points > 0 ? 'merit' : 'violation',
-                      category: point.reason,
-                      points: point.points,
-                      date: point.date.toISOString().split('T')[0],
-                      comment: point.reason
-                  });
-              }
+        if (point.points > 0) {
+          monthlyData.get(monthKey).merits += point.points;
+          classData.totalMerits += point.points;
+
+          // Track merit types
+          if (!meritTypes.has(point.reason)) {
+            meritTypes.set(point.reason, 0);
           }
+          meritTypes.set(point.reason, meritTypes.get(point.reason) + 1);
+        } else {
+          monthlyData.get(monthKey).violations += Math.abs(point.points);
+          classData.totalViolations += Math.abs(point.points);
 
-          // Format monthly stats
-          classData.monthlyStats = Array.from(monthlyData.entries())
-              .map(([month, data]) => ({
-                  month,
-                  merits: data.merits,
-                  violations: data.violations
-              }))
-              .sort((a, b) => {
-                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                  return months.indexOf(a.month) - months.indexOf(b.month);
-              });
+          // Track violation types
+          if (!violationTypes.has(point.reason)) {
+            violationTypes.set(point.reason, 0);
+          }
+          violationTypes.set(
+            point.reason,
+            violationTypes.get(point.reason) + 1
+          );
+        }
 
-          // Format merit types
-          classData.meritsByType = Array.from(meritTypes.entries())
-              .map(([type, count]) => ({
-                  type,
-                  count
-              }));
-
-          // Format violation types
-          classData.violationsByType = Array.from(violationTypes.entries())
-              .map(([type, count]) => ({
-                  type,
-                  count
-              }));
-
-          result[classroom.name] = classData;
-      }
-
-      return res.status(200).json(result);
-  } catch (error) {
-      console.error('Error in getMeritAnalytics:', error);
-      return res.status(500).json({ message: 'Internal server error', error: error.message });
-  }
-}
-const Parent = require('../models/parent');
-const getChildrenMeritData=async (req, res)=> {
-  try {
-      // Find parent and populate children
-      const parentId = req.user_id;
-      const parent = await Parent.findById(parentId)
-          .populate('children');
-
-      if (!parent) {
-          return res.status(404).json({ message: 'Parent not found' });
-      }
-
-      const formattedData = {};
-
-      // Process each child's data
-      for (const child of parent.children) {
-          // Get classroom info
-          const classroom = await Classroom.findById(child.class);
-          
-          // Get merit/demerit records
-          const meritRecords = await AwardedPoints.find({
-              studentId: child._id,
-              current: true
-          }).populate({
-              path: 'awardedBy',
-              select: 'name'
+        // Add to recent records if within last 5
+        if (classData.recentRecords.length < 5) {
+          classData.recentRecords.push({
+            id: point._id,
+            studentName: point.studentId.name,
+            type: point.points > 0 ? "merit" : "violation",
+            category: point.reason,
+            points: point.points,
+            date: point.date.toISOString().split("T")[0],
+            comment: point.reason,
           });
-
-          // Format student info
-          const studentInfo = {
-              id: child._id,
-              name: child.name,
-              grade: classroom ? classroom.name : '',
-              section: '', // Add section if available in your schema
-              rollNumber: child.rollNumber
-          };
-
-          // Format merit records
-          const records = meritRecords.map(record => ({
-              id: record._id,
-              date: record.date.toISOString().split('T')[0],
-              type: record.points > 0 ? 'merit' : 'violation',
-              points: record.points,
-              class: classroom.name, // Add class info if available
-              reason: record.reason,
-              issuedBy: record.awardedBy ? record.awardedBy.name : ''
-          }));
-
-          // Add to formatted data
-          formattedData[child._id] = {
-              studentInfo,
-              records
-          };
+        }
       }
 
-      res.json(formattedData);
+      // Format monthly stats
+      classData.monthlyStats = Array.from(monthlyData.entries())
+        .map(([month, data]) => ({
+          month,
+          merits: data.merits,
+          violations: data.violations,
+        }))
+        .sort((a, b) => {
+          const months = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
+          return months.indexOf(a.month) - months.indexOf(b.month);
+        });
 
+      // Format merit types
+      classData.meritsByType = Array.from(meritTypes.entries()).map(
+        ([type, count]) => ({
+          type,
+          count,
+        })
+      );
+
+      // Format violation types
+      classData.violationsByType = Array.from(violationTypes.entries()).map(
+        ([type, count]) => ({
+          type,
+          count,
+        })
+      );
+
+      result[classroom.name] = classData;
+    }
+
+    return res.status(200).json(result);
   } catch (error) {
-      console.error('Error fetching parent data:', error);
-      res.status(500).json({ 
-          message: 'Error fetching parent data',
-          error: error.message 
+    console.error("Error in getMeritAnalytics:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+const Parent = require("../models/parent");
+const getChildrenMeritData = async (req, res) => {
+  try {
+    // Find parent and populate children
+    const parentId = req.user_id;
+    const parent = await Parent.findById(parentId).populate("children");
+
+    if (!parent) {
+      return res.status(404).json({ message: "Parent not found" });
+    }
+
+    const formattedData = {};
+
+    // Process each child's data
+    for (const child of parent.children) {
+      // Get classroom info
+      const classroom = await Classroom.findById(child.class);
+
+      // Get merit/demerit records
+      const meritRecords = await AwardedPoints.find({
+        studentId: child._id,
+        current: true,
+      }).populate({
+        path: "awardedBy",
+        select: "name",
       });
+
+      // Format student info
+      const studentInfo = {
+        id: child._id,
+        name: child.name,
+        grade: classroom ? classroom.name : "",
+        section: "", // Add section if available in your schema
+        rollNumber: child.rollNumber,
+      };
+
+      // Format merit records
+      const records = meritRecords.map((record) => ({
+        id: record._id,
+        date: record.date.toISOString().split("T")[0],
+        type: record.points > 0 ? "merit" : "violation",
+        points: record.points,
+        class: classroom.name, // Add class info if available
+        reason: record.reason,
+        issuedBy: record.awardedBy ? record.awardedBy.name : "",
+      }));
+
+      // Add to formatted data
+      formattedData[child._id] = {
+        studentInfo,
+        records,
+      };
+    }
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error fetching parent data:", error);
+    res.status(500).json({
+      message: "Error fetching parent data",
+      error: error.message,
+    });
   }
 };
 const getLatestMeritData = async (req, res) => {
@@ -841,12 +871,10 @@ const getLatestMeritData = async (req, res) => {
     //get the last awarded points
     const lastAwardedPoints = latestData[0];
     res.json(lastAwardedPoints);
-  }
-
-  catch (error) {
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
-}
+};
 
 module.exports = {
   getLatestMeritData,
@@ -861,5 +889,5 @@ module.exports = {
   deleteDemeritTemplate,
   getMeritSystemData,
   getMeritAnalytics,
-  getChildrenMeritData
+  getChildrenMeritData,
 };
