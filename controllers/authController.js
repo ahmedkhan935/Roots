@@ -46,9 +46,28 @@ const loginUser = async (Model, req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
+
+    user.branch = "";
+    let assignedBranch = ""; //find user branch
+    if (Model === Student) {
+      const branch = await Branch.findById(user.branch_id);
+      if (!branch) {
+        return res.status(400).json({ message: "Branch not found" });
+      }
+      assignedBranch = branch.name;
+    }
+
+    if (Model === Branchadmin) {
+      const branch = await Branch.findById(user.branch_id);
+      if (!branch) {
+        return res.status(400).json({ message: "Branch not found" });
+      }
+      assignedBranch = branch.name;
+    }
     log("login", role, user._id);
-    res.json({ token });
+    res.json({ token, branch: assignedBranch });
   } catch (err) {
+    console.log(err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -190,7 +209,7 @@ const createStudent = async (req, res) => {
       address,
       contactNumber,
       age,
-      class: "675b2c68b0a7b664b9a397a5",
+      class: "67d386a0872d0289630e493c",
     });
     await newStudent.save();
     branch.students.push(newStudent._id);
@@ -350,16 +369,34 @@ const updateUser = async (req, res) => {
         });
         break;
       case "teacher":
-        user = await Teacher.findByIdAndUpdate(id, updates, {
-          new: true,
-          runValidators: true,
-        });
+        password = Teacher.findById(id).password;
+        if (updates.password) {
+          updates.password = await bcrypt.hash(updates.password, 10);
+        }
+
+        user = await Teacher.findByIdAndUpdate(
+          id,
+          { ...updates, password },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
         break;
       case "student":
-        user = await Student.findByIdAndUpdate(id, updates, {
-          new: true,
-          runValidators: true,
-        });
+        password = Student.findById(id).password;
+        if (updates.password) {
+          updates.password = await bcrypt.hash(updates.password, 10);
+        }
+
+        user = await Student.findByIdAndUpdate(
+          id,
+          { ...updates, password: updates.password },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
         break;
       case "parent":
         user = await Parent.findByIdAndUpdate(id, updates, {
@@ -495,6 +532,7 @@ const getAllStudents = async (req, res) => {
           name: student.name,
           class: className,
           meritPoints: totalMeritPoints,
+          branch_id: student.branch_id,
           demerits: totalDemerits,
           attendance: attendance,
           rank: rankMap[student._id.toString()],
@@ -507,6 +545,7 @@ const getAllStudents = async (req, res) => {
           blocked: student.blocked,
           dateOfBirth: student.dateOfBirth.toISOString().split("T")[0],
           classId: student.class._id,
+          parent: student.parent,
         });
       }
     }

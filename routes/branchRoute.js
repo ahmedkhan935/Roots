@@ -9,6 +9,7 @@ router.get("/teacher/data",verifyToken,branchController.getBranchTeachers);
 router.get("/student/data",verifyToken,branchController.getBranchStudents);
 router.post('/', verifyToken, verifyAdmin, branchController.createBranch);
 router.get('/', verifyToken, verifyAdmin, branchController.readBranches);
+router.delete('/', verifyToken, verifyAdmin, branchController.deleteBranch);
 router.get('/:id', verifyToken, verifyAdmin, branchController.readBranchbyId);
 router.put('/:id', verifyToken, verifyAdmin, branchController.updateBranch);
 router.delete('/:id', verifyToken, verifyAdmin, branchController.deleteBranch);

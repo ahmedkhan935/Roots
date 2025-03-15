@@ -27,17 +27,18 @@ const createBranch = async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 };
+
 const readBranches = async (req, res) => {
   try {
     // Get all branches with their teachers and students
-      const branches = await Branch.find({})
-        .populate("teachers")
-        .populate({
-            path: "students",
-            populate: {
-                path: "class"
-            }
-        });
+    const branches = await Branch.find({})
+      .populate("teachers")
+      .populate({
+        path: "students",
+        populate: {
+          path: "class",
+        },
+      });
     if (!branches.length) {
       return res.status(404).json({ message: "No branches found" });
     }
@@ -202,8 +203,8 @@ const readBranchbyId = async (req, res) => {
     const branch = await Branch.findById(branchId)
       .populate("teachers")
       .populate({
-        path:"students",
-        populate:"class"
+        path: "students",
+        populate: "class",
       });
 
     if (!branch) {
@@ -225,11 +226,11 @@ const readBranchbyId = async (req, res) => {
       studentId: { $in: branch.students.map((s) => s._id) },
       current: true,
     }).populate({
-      path:"studentId",
-      populate:{
-        path:"class",
-        select:"name"
-      }
+      path: "studentId",
+      populate: {
+        path: "class",
+        select: "name",
+      },
     });
 
     // Calculate monthly trends (last 5 months)
@@ -335,7 +336,7 @@ async function calculateMonthlyTrend(branchId) {
       // Get all awarded points for this period
       const monthData = await AwardedPoints.find({
         date: { $gte: startDate, $lte: endDate },
-        current : true
+        current: true,
       }).populate({
         path: "awardedBy",
         select: "branch_id",
@@ -413,17 +414,17 @@ async function getTopStudents(students, meritPoints) {
     const violations = studentMerits
       .filter((p) => p.points < 0)
       .reduce((sum, p) => sum + Math.abs(p.points), 0);
-
+    console.log(student);
     return {
       id: student._id,
-      name: student.name,
+      name: student.name || "Unknown Student",
       class: student.class.name,
       points: totalPoints,
       merits,
       violations,
     };
   });
-  
+
   return studentPoints.sort((a, b) => b.points - a.points).slice(0, 5);
 }
 
@@ -437,13 +438,12 @@ async function getRecentActivity(branchId) {
     .populate({
       path: "studentId",
       select: "name class",
-      populate: { 
+      populate: {
         path: "class",
-        select: "name"
-      }
-
+        select: "name",
+      },
     })
-    
+
     .sort({ date: -1 })
     .limit(5)
     .then((activities) =>
@@ -493,9 +493,21 @@ async function calculateTeacherStats(teacherId) {
 
 const updateBranch = async (req, res) => {
   try {
-    const branch = await Branch.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    //only branchname address capacity contactnumber email can be updated
+    const { name, address, capacity, contactNumber, email } = req.body;
+    const branch = await Branch.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        address,
+        capacity,
+        contactNumber,
+        email,
+      },
+      {
+        new: true,
+      }
+    );
     if (!branch) {
       return res.status(404).json({ message: "Branch not found" });
     }
@@ -567,7 +579,6 @@ const addStudentsToClass = async (req, res) => {
     const prev_points = await AwardedPoints.find({
       student_id: { $in: student_ids },
       current: true,
-
     });
     if (prev_points.length > 0) {
       await AwardedPoints.updateMany(
@@ -592,8 +603,7 @@ const changeStudentClass = async (req, res) => {
       .json({ message: "Student ID and new class ID are required" });
   }
   try {
-    const classroom = await
-    Classroom.findOne({ name: new_class_name });
+    const classroom = await Classroom.findOne({ name: new_class_name });
     const new_class_id = classroom._id;
     const student = await Student.findById(student_id);
     if (!student) {
@@ -777,11 +787,9 @@ const assignTeacher = async (req, res) => {
 const changeSubjectTeacher = async (req, res) => {
   const { class_id, subject_id, new_teacher_id } = req.body;
   if (!class_id || !subject_id || !new_teacher_id) {
-    return res
-      .status(400)
-      .json({
-        message: "Class ID, subject ID and new teacher ID are required",
-      });
+    return res.status(400).json({
+      message: "Class ID, subject ID and new teacher ID are required",
+    });
   }
   try {
     const classroom = await Classroom.findById(class_id);
@@ -898,39 +906,40 @@ const getAwardedMeritsByBranch = async (req, res) => {
 };
 
 const getBranchTeachers = async (req, res) => {
-    const admin_id = req.user_id;
-    try {
-        const branch = await branchadmin.findById(admin_id);
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch admin not found' });
-        }
-        const teachers = await Teacher.find({ branch_id: branch.branch_id });
-        if (!teachers.length) {
-            return res.status(404).json({ message: 'No teachers found' });
-        }
-        log('Teachers retrieved ' + branch.branch_id, 'branchadmin', req.user_id);
-        res.status(200).json(teachers);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+  const admin_id = req.user_id;
+  try {
+    const branch = await branchadmin.findById(admin_id);
+    if (!branch) {
+      return res.status(404).json({ message: "Branch admin not found" });
     }
-}
+
+    const teachers = await Teacher.find({ branch_id: branch.branch_id });
+    if (!teachers.length) {
+      return res.status(404).json({ message: "No teachers found" });
+    }
+    log("Teachers retrieved " + branch.branch_id, "branchadmin", req.user_id);
+    res.status(200).json(teachers);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 const getBranchStudents = async (req, res) => {
-    const admin_id = req.user_id;
-    try {
-        const branch = await branchadmin.findById(admin_id);
-        if (!branch) {
-            return res.status(404).json({ message: 'Branch admin not found' });
-        }
-        const students = await Student.find({ branch_id: branch.branch_id });
-        if (!students.length) {
-            return res.status(404).json({ message: 'No students found' });
-        }
-        log('Students retrieved ' + branch.branch_id, 'branchadmin', req.user_id);
-        res.status(200).json(students);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+  const admin_id = req.user_id;
+  try {
+    const branch = await branchadmin.findById(admin_id);
+    if (!branch) {
+      return res.status(404).json({ message: "Branch admin not found" });
     }
-}
+    const students = await Student.find({ branch_id: branch.branch_id });
+    if (!students.length) {
+      return res.status(404).json({ message: "No students found" });
+    }
+    log("Students retrieved " + branch.branch_id, "branchadmin", req.user_id);
+    res.status(200).json(students);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 exports.getBranchTeachers = getBranchTeachers;
 exports.getBranchStudents = getBranchStudents;
 
