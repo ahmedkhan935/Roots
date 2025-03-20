@@ -209,7 +209,7 @@ const createStudent = async (req, res) => {
       address,
       contactNumber,
       age,
-      class: "67d386a0872d0289630e493c",
+      class: classroom._id,
     });
     await newStudent.save();
     branch.students.push(newStudent._id);
@@ -560,6 +560,94 @@ const getAllStudents = async (req, res) => {
     });
   }
 };
+
+const getAdminAllStudents = async (req, res) => {
+  try {
+    const branchAdmin = await Branchadmin.findById(req.user_id);
+    if (!branchAdmin) {
+      return res.status(400).json({ message: "Branch admin not found" });
+    }
+    const branch = await Branch.findById(branchAdmin.branch_id);
+    if (!branch) {
+      return res.status(400).json({ message: "Branch not found" });
+    }
+    const classrooms = await Classroom.find({ branch_id: branch._id }).populate(
+      "students"
+    );
+    const result = {};
+    const allStudents = await Student.find().populate("class").lean();
+
+    for (const classroom of classrooms) {
+      const className = classroom.name;
+      result[className] = [];
+
+      const classStudents = allStudents.filter(
+        (student) => student.class && student.class._id.equals(classroom._id)
+      );
+
+      const rankMap = calculateRank(classStudents);
+
+      // Process each student
+      for (const student of classStudents) {
+        const attendance = await calculateAttendance(student._id);
+
+        // Calculate merit points for THIS student only
+        const meritPoints = await AwardedPoints.find({
+          studentId: student._id,
+          current: true,
+          points: { $gt: 0 }, // Add this to get only positive points
+        });
+        const totalMeritPoints = meritPoints.reduce(
+          (sum, record) => sum + record.points,
+          0
+        );
+
+        // Calculate demerits for THIS student only
+        const demerits = await AwardedPoints.find({
+          studentId: student._id,
+          current: true,
+          points: { $lt: 0 },
+        });
+        const totalDemerits = demerits.reduce(
+          (sum, record) => sum + record.points,
+          0
+        );
+
+        result[className].push({
+          id: student._id,
+          rollNumber: student.rollNumber,
+          name: student.name,
+          class: className,
+          meritPoints: totalMeritPoints,
+          branch_id: student.branch_id,
+          demerits: totalDemerits,
+          attendance: attendance,
+          rank: rankMap[student._id.toString()],
+          lastUpdated:
+            student.updatedAt || new Date().toISOString().split("T")[0],
+          cnic: student.cnic,
+          contactNumber: student.contactNumber,
+          email: student.email,
+          address: student.address,
+          blocked: student.blocked,
+          dateOfBirth: student.dateOfBirth.toISOString().split("T")[0],
+          classId: student.class._id,
+          parent: student.parent,
+        });
+      }
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in getAllStudents:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching students data",
+      error: error.message,
+    });
+  }
+};
+
 const getAdminBranch = async (req, res) => {
   const id = req.user_id;
 
@@ -851,6 +939,7 @@ exports.getFilteredPointsHistory = getMeritPointsData;
 exports.getMeritReport = getMeritReport;
 exports.getAdminBranch = getAdminBranch;
 exports.getAllStudents = getAllStudents;
+exports.getAdminAllStudents = getAdminAllStudents;
 
 exports.deleteUser = deleteUser;
 exports.getAllUsers = getAllUsers;

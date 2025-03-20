@@ -138,6 +138,7 @@ const readBranches = async (req, res) => {
           location: branch.location,
           classes: branchClassrooms.map((c) => c.name),
           teachers: teacherData,
+          students: branch.students.map((s) => s.name),
           stats: {
             totalMerits,
             totalViolations,

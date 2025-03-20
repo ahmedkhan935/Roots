@@ -8,6 +8,7 @@ dotenv.config();
 
 // ...existing code...
 router.get("/student2",verifyToken,authController.getAllStudents);
+router.get("/student3",verifyToken,authController.getAdminAllStudents);
 router.get("/student-dash",verifyToken,authController.getMeritReport);
 router.post("/student/forgot-password",authController.forgotStudentPassword);
 router.get("/student-dash2",verifyToken,authController.getFilteredPointsHistory);

@@ -659,12 +659,20 @@ const getMeritSystemData = async (req, res) => {
 const getMeritAnalytics = async (req, res) => {
   try {
     const { classId } = req.query;
+    const { user_id } = req;
     const result = {};
 
     // If classId is provided, get data for specific class, otherwise get for all classes
-    const classrooms = classId
+    let classrooms = classId
       ? [await Classroom.findById(classId)]
       : await Classroom.find();
+
+    //filter the classrooms to be the ones the teacher is assigned to
+    const teacher = await Teacher.findById(user_id);
+    const teacherClasses = teacher.classes.map((c) => c.class_id.toString());
+    classrooms = classrooms.filter((c) =>
+      teacherClasses.includes(c._id.toString())
+    );
 
     for (const classroom of classrooms) {
       const classData = {
@@ -733,7 +741,7 @@ const getMeritAnalytics = async (req, res) => {
             category: point.reason,
             points: point.points,
             date: point.date.toISOString().split("T")[0],
-            comment: point.reason,
+            comment: point.comments,
           });
         }
       }
@@ -860,16 +868,26 @@ const getLatestMeritData = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Student not found" });
     }
+    // const latestData = await AwardedPoints.find({
+    //   studentId: user_id,
+    //   current: true,
+
+    // })
+    //   .populate("awardedBy")
+    //   .sort({ date: -1 })
+    //   .limit(1);
+
+    //get latest merits or demerits
     const latestData = await AwardedPoints.find({
       studentId: user_id,
       current: true,
-      points: { $gt: 0 },
-    })
-      .populate("awardedBy")
-      .sort({ date: -1 })
-      .limit(1);
+    }).populate("awardedBy");
+
+    console.log(latestData);
+
     //get the last awarded points
-    const lastAwardedPoints = latestData[0];
+    const lastAwardedPoints = latestData[latestData.length - 1];
+
     res.json(lastAwardedPoints);
   } catch (error) {
     res.status(500).json({ error: error.message });
