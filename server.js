@@ -11,7 +11,7 @@ const teacherRoutes = require("./routes/TeacherRoute");
 app.use(express.json());
 app.use(
   cors({
-    origin: "https://rgsmeritportal.com"
+    origin: "*"
   })
 );
 app.use("/api/auth", authroutes);
